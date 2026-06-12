@@ -1,0 +1,29 @@
+# Binaries (built artifacts)
+/bin/
+*.exe
+
+# Env
+.env
+.env.local
+
+# Go
+/vendor/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test
+coverage.out
+*.test
+
+# Temp
+/tmp/
+*.mp4
+*.mp3
+*.png
