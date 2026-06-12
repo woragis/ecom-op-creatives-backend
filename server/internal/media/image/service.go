@@ -10,19 +10,22 @@ import (
 	"github.com/woragis/ecom-op-creatives-backend/server/internal/config"
 	"github.com/woragis/ecom-op-creatives-backend/server/internal/media/storage"
 	"github.com/woragis/ecom-op-creatives-backend/server/internal/models"
+	"github.com/woragis/ecom-op-creatives-backend/server/internal/platform/applog"
 )
 
 type Service struct {
-	registry  *Registry
-	store     *storage.Local
-	maxScenes int
+	registry         *Registry
+	store            *storage.Local
+	maxScenes        int
+	preferGenerated  bool
 }
 
 func NewService(cfg config.Config, registry *Registry, store *storage.Local) *Service {
 	return &Service{
-		registry:  registry,
-		store:     store,
-		maxScenes: cfg.ImageMaxScenes,
+		registry:        registry,
+		store:           store,
+		maxScenes:       cfg.ImageMaxScenes,
+		preferGenerated: cfg.ImagePreferGenerated,
 	}
 }
 
@@ -61,15 +64,22 @@ func (s *Service) GenerateScenes(
 			role = RoleScene
 		}
 
-		if url := assetURLForRole(assets, role); url != "" {
-			images = append(images, GeneratedImage{
-				SceneID:   sc.ID,
-				Role:      role,
-				PublicURL: url,
-				FilePath:  s.store.FilePath(runID, storage.PublicToRelPath(url)),
-				Source:    "user_asset",
-			})
-			continue
+		if !s.preferGenerated {
+			if url := assetURLForRole(assets, role); url != "" {
+				applog.FromContext(ctx).With("step", "image", "scene_id", sc.ID, "role", role).Info(
+					"reusing uploaded asset",
+					"source", "user_asset",
+					"public_url", url,
+				)
+				images = append(images, GeneratedImage{
+					SceneID:   sc.ID,
+					Role:      role,
+					PublicURL: url,
+					FilePath:  s.store.FilePath(runID, storage.PublicToRelPath(url)),
+					Source:    "user_asset",
+				})
+				continue
+			}
 		}
 
 		prompt := imagePrompts[sc.ID].ImagePrompt
