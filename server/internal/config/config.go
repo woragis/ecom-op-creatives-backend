@@ -17,6 +17,8 @@ type Config struct {
 	ElevenLabsKey   string
 	ElevenLabsVoice string
 	ElevenLabsMock  bool
+	OpenAITTSModel  string
+	OpenAITTSVoice  string
 	StorageDir      string
 	RenderDir       string
 	SupervisorMin   int
@@ -46,6 +48,7 @@ type Config struct {
 	FFmpegPath           string
 	IntroDurationMs      int
 	APIPublicURL         string
+	APIInternalURL       string
 }
 
 func Load() Config {
@@ -60,6 +63,8 @@ func Load() Config {
 		ElevenLabsKey:   strings.TrimSpace(os.Getenv("ELEVENLABS_API_KEY")),
 		ElevenLabsVoice: envOr("ELEVENLABS_VOICE_ID", "21m00Tcm4TlvDq8ikWAM"),
 		ElevenLabsMock:  envBool("ELEVENLABS_MOCK"),
+		OpenAITTSModel:  envOr("OPENAI_TTS_MODEL", "tts-1"),
+		OpenAITTSVoice:  envOr("OPENAI_TTS_VOICE", "alloy"),
 		StorageDir:      envOr("STORAGE_DIR", "../storage"),
 		RenderDir:       envOr("RENDER_DIR", "../worker-render"),
 		SupervisorMin:        envInt("SUPERVISOR_MIN_SCORE", 75),
@@ -89,7 +94,15 @@ func Load() Config {
 		FFmpegPath:           envOr("FFMPEG_PATH", "ffmpeg"),
 		IntroDurationMs:      envInt("INTRO_DURATION_MS", 2500),
 		APIPublicURL:         envOr("API_PUBLIC_URL", "http://localhost:8080"),
+		APIInternalURL:       strings.TrimSpace(os.Getenv("API_INTERNAL_URL")),
 	}
+}
+
+func (c Config) MediaBaseURL() string {
+	if c.APIInternalURL != "" {
+		return strings.TrimRight(c.APIInternalURL, "/")
+	}
+	return strings.TrimRight(c.APIPublicURL, "/")
 }
 
 func envOr(key, def string) string {

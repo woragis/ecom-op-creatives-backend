@@ -11,7 +11,7 @@ import (
 	"github.com/woragis/ecom-op-creatives-backend/server/internal/agent/shared/serper"
 	creativerunrepo "github.com/woragis/ecom-op-creatives-backend/server/internal/creativerun/repository"
 	"github.com/woragis/ecom-op-creatives-backend/server/internal/config"
-	"github.com/woragis/ecom-op-creatives-backend/server/internal/media/elevenlabs"
+	"github.com/woragis/ecom-op-creatives-backend/server/internal/media/tts"
 	imagemedia "github.com/woragis/ecom-op-creatives-backend/server/internal/media/image"
 	postprocessmedia "github.com/woragis/ecom-op-creatives-backend/server/internal/media/postprocess"
 	"github.com/woragis/ecom-op-creatives-backend/server/internal/media/storage"
@@ -34,7 +34,7 @@ func NewExecutor(
 	}
 	llmClient := llm.NewFromConfig(cfg)
 	serperClient := serper.NewFromConfig(cfg)
-	tts := elevenlabs.New(cfg.ElevenLabsKey, cfg.ElevenLabsVoice, cfg.ElevenLabsMock || cfg.ElevenLabsKey == "")
+	ttsClient := tts.NewFromConfig(cfg)
 	videoRegistry := video.NewRegistry(cfg)
 	videoSvc := video.NewService(cfg, videoRegistry, store)
 	imageRegistry := imagemedia.NewRegistry(cfg)
@@ -48,7 +48,7 @@ func NewExecutor(
 		Products:   products,
 		Pipeline:   pipelineSvc,
 		Storage:    store,
-		TTS:        tts,
+		TTS:        ttsClient,
 		Research:   researchagent.New(llmClient, serperClient),
 		Hooks:      hooksagent.New(llmClient),
 		Script:     scriptagent.New(llmClient),

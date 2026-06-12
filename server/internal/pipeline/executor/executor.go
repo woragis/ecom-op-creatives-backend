@@ -19,7 +19,7 @@ import (
 	supervisoragent "github.com/woragis/ecom-op-creatives-backend/server/internal/agent/supervisor"
 	creativerunrepo "github.com/woragis/ecom-op-creatives-backend/server/internal/creativerun/repository"
 	"github.com/woragis/ecom-op-creatives-backend/server/internal/config"
-	"github.com/woragis/ecom-op-creatives-backend/server/internal/media/elevenlabs"
+	"github.com/woragis/ecom-op-creatives-backend/server/internal/media/tts"
 	imagemedia "github.com/woragis/ecom-op-creatives-backend/server/internal/media/image"
 	postprocessmedia "github.com/woragis/ecom-op-creatives-backend/server/internal/media/postprocess"
 	rendermedia "github.com/woragis/ecom-op-creatives-backend/server/internal/media/render"
@@ -37,7 +37,7 @@ type Executor struct {
 	products  *productrepo.Repository
 	pipeline  *pipelinesvc.Service
 	storage   *storage.Local
-	tts       *elevenlabs.Client
+	tts       tts.Synthesizer
 	research  *researchagent.Agent
 	hooks     *hooksagent.Agent
 	script    *scriptagent.Agent
@@ -56,7 +56,7 @@ type Deps struct {
 	Products   *productrepo.Repository
 	Pipeline   *pipelinesvc.Service
 	Storage    *storage.Local
-	TTS        *elevenlabs.Client
+	TTS        tts.Synthesizer
 	Research   *researchagent.Agent
 	Hooks      *hooksagent.Agent
 	Script     *scriptagent.Agent
@@ -261,7 +261,7 @@ func (e *Executor) stepVoice(ctx context.Context, rc *runContext) ([]byte, error
 	var script *scriptwriter.Output
 	_ = json.Unmarshal(rc.outputs["script"], &script)
 	text := scriptagent.FullNarration(script)
-	audio, err := e.tts.Synthesize(ctx, text)
+	audio, provider, err := e.tts.Synthesize(ctx, text)
 	if err != nil {
 		return nil, err
 	}
@@ -273,7 +273,7 @@ func (e *Executor) stepVoice(ctx context.Context, rc *runContext) ([]byte, error
 		"text":        text,
 		"filePath":    path,
 		"publicUrl":   e.storage.PublicPath(rc.run.ID.String(), "narration.mp3"),
-		"provider":    "elevenlabs",
+		"provider":    provider,
 	})
 }
 
@@ -373,7 +373,7 @@ func (e *Executor) stepRender(ctx context.Context, rc *runContext) ([]byte, erro
 		NarrationURL:    narrationURL,
 		IntroClip:       introClip,
 		IntroDurationMs: e.cfg.IntroDurationMs,
-		MediaBaseURL:    e.cfg.APIPublicURL,
+		MediaBaseURL:    e.cfg.MediaBaseURL(),
 		Script:          script,
 		Director:        dir,
 		Captions:        caps,
@@ -414,7 +414,7 @@ func (e *Executor) runRender(ctx context.Context, manifestPath, outputPath strin
 	cmd := exec.CommandContext(ctx, "node", script, manifestPath, outputPath)
 	cmd.Dir = renderDir
 	cmd.Env = append(os.Environ(),
-		"API_PUBLIC_URL="+e.cfg.APIPublicURL,
+		"API_PUBLIC_URL="+e.cfg.MediaBaseURL(),
 		"STORAGE_DIR="+e.cfg.StorageDir,
 		"RENDER_MOCK=0",
 	)
