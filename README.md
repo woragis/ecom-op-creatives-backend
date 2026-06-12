@@ -65,6 +65,14 @@ DATABASE_URL=postgres://creatives:creatives@localhost:5432/creatives?sslmode=dis
   go test -tags=integration ./internal/product/repository/...
 ```
 
+## Phase 7 — Observability & storage
+
+- Artifact mirror: `storage/runs/{id}/artifacts/{NN}-{step}.json`
+- Structured logging: `LOG_LEVEL`, `LOG_FORMAT=json`, fields `run_id` + `step`
+- `PAUSE_BEFORE_VIDEO=1` — pausa após `image` para revisar antes do vídeo pago
+- `POST /v1/creative-runs/{id}/continue` — retoma pipeline pausado
+- Postgres bind mount: `./data/postgres` (ver root `docker-compose.yml`)
+
 ## Phase 6 — Production UI APIs
 
 - `POST /v1/creative-runs/{id}/approve` — mark run `approved` from `needs_review`
