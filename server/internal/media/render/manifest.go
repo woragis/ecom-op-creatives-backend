@@ -8,6 +8,8 @@ import (
 	"github.com/woragis/ecom-op-creatives-backend/server/internal/media/subtitles"
 )
 
+const DefaultIntroDurationMs = 2500
+
 type Scene struct {
 	ID         string              `json:"id"`
 	StartMs    int                 `json:"startMs"`
@@ -24,24 +26,28 @@ type Audio struct {
 }
 
 type Manifest struct {
-	RunID     string            `json:"runId"`
-	Format    director.Format   `json:"format"`
-	Scenes    []Scene           `json:"scenes"`
-	Captions  *subtitles.Output `json:"captions"`
-	Audio     Audio             `json:"audio"`
-	Product   string            `json:"productName"`
-	IntroClip string            `json:"introClip,omitempty"`
+	RunID           string            `json:"runId"`
+	Format          director.Format   `json:"format"`
+	Scenes          []Scene           `json:"scenes"`
+	Captions        *subtitles.Output `json:"captions"`
+	Audio           Audio             `json:"audio"`
+	Product         string            `json:"productName"`
+	IntroClip       string            `json:"introClip,omitempty"`
+	IntroDurationMs int               `json:"introDurationMs,omitempty"`
+	MediaBaseURL    string            `json:"mediaBaseUrl,omitempty"`
 }
 
 type Input struct {
-	RunID        string
-	ProductName  string
-	NarrationURL string
-	IntroClip    string
-	Script       *scriptwriter.Output
-	Director     *director.Output
-	Captions     *subtitles.Output
-	SceneVideos  map[string]string
+	RunID           string
+	ProductName     string
+	NarrationURL    string
+	IntroClip       string
+	IntroDurationMs int
+	MediaBaseURL    string
+	Script          *scriptwriter.Output
+	Director        *director.Output
+	Captions        *subtitles.Output
+	SceneVideos     map[string]string
 }
 
 func BuildManifest(in Input) *Manifest {
@@ -53,6 +59,14 @@ func BuildManifest(in Input) *Manifest {
 	if in.Director != nil {
 		for _, s := range in.Director.Scenes {
 			dirMap[s.SceneID] = s
+		}
+	}
+
+	introMs := 0
+	if in.IntroClip != "" {
+		introMs = in.IntroDurationMs
+		if introMs <= 0 {
+			introMs = DefaultIntroDurationMs
 		}
 	}
 
@@ -68,7 +82,7 @@ func BuildManifest(in Input) *Manifest {
 			}
 			scenes = append(scenes, Scene{
 				ID:         sc.ID,
-				StartMs:    sc.StartMs,
+				StartMs:    sc.StartMs + introMs,
 				DurationMs: sc.EndMs - sc.StartMs,
 				Background: bg,
 				Narration:  sc.Narration,
@@ -76,6 +90,11 @@ func BuildManifest(in Input) *Manifest {
 				Transition: tr,
 			})
 		}
+	}
+
+	caps := in.Captions
+	if introMs > 0 && caps != nil {
+		caps = subtitles.Offset(caps, introMs)
 	}
 
 	musicVol := 0.2
@@ -89,14 +108,30 @@ func BuildManifest(in Input) *Manifest {
 	}
 
 	return &Manifest{
-		RunID:     in.RunID,
-		Format:    format,
-		Scenes:    scenes,
-		Captions:  in.Captions,
-		Audio:     Audio{NarrationURL: in.NarrationURL, MusicVolume: musicVol},
-		Product:   in.ProductName,
-		IntroClip: in.IntroClip,
+		RunID:           in.RunID,
+		Format:          format,
+		Scenes:          scenes,
+		Captions:        caps,
+		Audio:           Audio{NarrationURL: in.NarrationURL, MusicVolume: musicVol},
+		Product:         in.ProductName,
+		IntroClip:       in.IntroClip,
+		IntroDurationMs: introMs,
+		MediaBaseURL:    in.MediaBaseURL,
 	}
+}
+
+func (m *Manifest) TotalDurationMs() int {
+	total := m.IntroDurationMs
+	for _, s := range m.Scenes {
+		end := s.StartMs + s.DurationMs
+		if end > total {
+			total = end
+		}
+	}
+	if total <= 0 {
+		return 20000
+	}
+	return total
 }
 
 func (m *Manifest) JSON() ([]byte, error) {

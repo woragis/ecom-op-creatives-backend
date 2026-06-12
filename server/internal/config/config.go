@@ -40,6 +40,12 @@ type Config struct {
 	StabilityAPIKey string
 	ImageProviderDefault string
 	VideoProviderDefault string
+	SubtitlesMock        bool
+	RenderMock           bool
+	PostprocessMock      bool
+	FFmpegPath           string
+	IntroDurationMs      int
+	APIPublicURL         string
 }
 
 func Load() Config {
@@ -77,6 +83,12 @@ func Load() Config {
 		StabilityAPIKey:      strings.TrimSpace(os.Getenv("STABILITY_API_KEY")),
 		ImageProviderDefault: envOr("IMAGE_PROVIDER_DEFAULT", "flux"),
 		VideoProviderDefault: envOr("VIDEO_PROVIDER_DEFAULT", "kling"),
+		SubtitlesMock:        envBool("SUBTITLES_MOCK"),
+		RenderMock:           envBool("RENDER_MOCK"),
+		PostprocessMock:      envBool("POSTPROCESS_MOCK"),
+		FFmpegPath:           envOr("FFMPEG_PATH", "ffmpeg"),
+		IntroDurationMs:      envInt("INTRO_DURATION_MS", 2500),
+		APIPublicURL:         envOr("API_PUBLIC_URL", "http://localhost:8080"),
 	}
 }
 

@@ -5,11 +5,11 @@ import { fileURLToPath } from "node:url";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 /**
- * Phase 1 render entrypoint.
+ * Remotion render entrypoint.
  * Usage: node scripts/render.mjs <manifest.json> <output.mp4>
  *
- * When Remotion deps are installed, this bundles UGCVertical composition.
- * Falls back to copying mock bytes when RENDER_MOCK=1 or bundle fails.
+ * Set RENDER_MOCK=1 to write stub bytes (dev without Remotion deps).
+ * With RENDER_MOCK=0, Remotion must be installed (npm install in worker-render).
  */
 async function main() {
   const [manifestPath, outputPath] = process.argv.slice(2);
@@ -19,39 +19,44 @@ async function main() {
   }
 
   const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
-  console.log("Rendering run", manifest.runId, "scenes:", manifest.scenes?.length ?? 0);
+  const apiBase = process.env.API_PUBLIC_URL ?? "http://localhost:8080";
+  console.log(
+    "Rendering run",
+    manifest.runId,
+    "scenes:",
+    manifest.scenes?.length ?? 0,
+    "introMs:",
+    manifest.introDurationMs ?? 0,
+    "media:",
+    apiBase
+  );
 
   if (process.env.RENDER_MOCK === "1" || process.env.RENDER_MOCK === "true") {
     writeMock(outputPath);
     return;
   }
 
-  try {
-    const { bundle } = await import("@remotion/bundler");
-    const { renderMedia, selectComposition } = await import("@remotion/renderer");
+  const { bundle } = await import("@remotion/bundler");
+  const { renderMedia, selectComposition } = await import("@remotion/renderer");
 
-    const entry = path.join(__dirname, "..", "remotion", "index.tsx");
-    const bundleLocation = await bundle({ entryPoint: entry });
+  const entry = path.join(__dirname, "..", "remotion", "index.tsx");
+  const bundleLocation = await bundle({ entryPoint: entry });
 
-    const composition = await selectComposition({
-      serveUrl: bundleLocation,
-      id: "UGCVertical",
-      inputProps: { manifest },
-    });
+  const composition = await selectComposition({
+    serveUrl: bundleLocation,
+    id: "UGCVertical",
+    inputProps: { manifest },
+  });
 
-    await renderMedia({
-      composition,
-      serveUrl: bundleLocation,
-      codec: "h264",
-      outputLocation: outputPath,
-      inputProps: { manifest },
-    });
+  await renderMedia({
+    composition,
+    serveUrl: bundleLocation,
+    codec: "h264",
+    outputLocation: outputPath,
+    inputProps: { manifest },
+  });
 
-    console.log("Rendered", outputPath);
-  } catch (err) {
-    console.warn("Remotion render failed, using fallback:", err.message);
-    writeMock(outputPath);
-  }
+  console.log("Rendered", outputPath);
 }
 
 function writeMock(outputPath) {

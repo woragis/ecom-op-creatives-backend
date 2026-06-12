@@ -24,19 +24,23 @@ type Manifest = {
   audio?: { narrationUrl?: string; musicVolume?: number };
   productName?: string;
   introClip?: string;
+  introDurationMs?: number;
+  mediaBaseUrl?: string;
 };
 
-const INTRO_MS = 2500;
-
-const mediaSrc = (url: string) =>
-  url.startsWith("http") ? url : `http://localhost:8080${url}`;
+const mediaSrc = (url: string, base?: string) => {
+  const root = base ?? "http://localhost:8080";
+  return url.startsWith("http") ? url : `${root}${url}`;
+};
 
 export const UGCVertical: React.FC<{ manifest: Manifest }> = ({ manifest }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
   const ms = (frame / fps) * 1000;
+  const src = (url: string) => mediaSrc(url, manifest.mediaBaseUrl);
 
-  const showingIntro = Boolean(manifest.introClip) && ms < INTRO_MS;
+  const introMs = manifest.introDurationMs ?? (manifest.introClip ? 2500 : 0);
+  const showingIntro = Boolean(manifest.introClip) && ms < introMs;
 
   const scene =
     manifest.scenes?.find((s) => ms >= s.startMs && ms < s.startMs + s.durationMs) ??
@@ -52,14 +56,14 @@ export const UGCVertical: React.FC<{ manifest: Manifest }> = ({ manifest }) => {
       {showingIntro && manifest.introClip ? (
         <AbsoluteFill>
           <OffthreadVideo
-            src={mediaSrc(manifest.introClip)}
+            src={src(manifest.introClip)}
             style={{ width: "100%", height: "100%", objectFit: "cover" }}
           />
         </AbsoluteFill>
       ) : scene?.videoUrl ? (
         <AbsoluteFill>
           <OffthreadVideo
-            src={mediaSrc(scene.videoUrl)}
+            src={src(scene.videoUrl)}
             style={{ width: "100%", height: "100%", objectFit: "cover" }}
           />
           <AbsoluteFill style={{ backgroundColor: "rgba(0,0,0,0.35)" }} />
@@ -67,7 +71,7 @@ export const UGCVertical: React.FC<{ manifest: Manifest }> = ({ manifest }) => {
       ) : null}
 
       {manifest.audio?.narrationUrl ? (
-        <Audio src={mediaSrc(manifest.audio.narrationUrl)} />
+        <Audio src={src(manifest.audio.narrationUrl)} />
       ) : null}
 
       <AbsoluteFill
@@ -111,7 +115,12 @@ export const UGCVertical: React.FC<{ manifest: Manifest }> = ({ manifest }) => {
 const SceneProgress: React.FC<{ ms: number; manifest: Manifest }> = ({ ms, manifest }) => {
   const scenes = manifest.scenes ?? [];
   if (scenes.length === 0) return null;
-  const total = scenes.reduce((m, s) => Math.max(m, s.startMs + s.durationMs), 1);
+  const introMs = manifest.introDurationMs ?? (manifest.introClip ? 2500 : 0);
+  const total = Math.max(
+    introMs,
+    scenes.reduce((m, s) => Math.max(m, s.startMs + s.durationMs), 0),
+    1
+  );
   const progress = interpolate(ms, [0, total], [0, 100], { extrapolateRight: "clamp" });
   return (
     <div

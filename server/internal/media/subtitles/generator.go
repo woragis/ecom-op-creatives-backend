@@ -13,8 +13,10 @@ type Word struct {
 }
 
 type Output struct {
-	Style string `json:"style"`
-	Words []Word `json:"words"`
+	Style  string `json:"style"`
+	Words  []Word `json:"words"`
+	SRTURL string `json:"srtUrl,omitempty"`
+	Source string `json:"source,omitempty"`
 }
 
 func FromScript(script *scriptwriter.Output) *Output {

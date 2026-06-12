@@ -13,7 +13,9 @@ import (
 	"github.com/woragis/ecom-op-creatives-backend/server/internal/config"
 	"github.com/woragis/ecom-op-creatives-backend/server/internal/media/elevenlabs"
 	imagemedia "github.com/woragis/ecom-op-creatives-backend/server/internal/media/image"
+	postprocessmedia "github.com/woragis/ecom-op-creatives-backend/server/internal/media/postprocess"
 	"github.com/woragis/ecom-op-creatives-backend/server/internal/media/storage"
+	"github.com/woragis/ecom-op-creatives-backend/server/internal/media/subtitles"
 	"github.com/woragis/ecom-op-creatives-backend/server/internal/media/video"
 	"github.com/woragis/ecom-op-creatives-backend/server/internal/pipeline/executor"
 	pipelinesvc "github.com/woragis/ecom-op-creatives-backend/server/internal/pipeline/service"
@@ -37,6 +39,8 @@ func NewExecutor(
 	videoSvc := video.NewService(cfg, videoRegistry, store)
 	imageRegistry := imagemedia.NewRegistry(cfg)
 	imageSvc := imagemedia.NewService(cfg, imageRegistry, store)
+	subtitlesSvc := subtitles.NewService(cfg)
+	postprocessProc := postprocessmedia.New(cfg)
 
 	return executor.New(executor.Deps{
 		Cfg:        cfg,
@@ -51,7 +55,9 @@ func NewExecutor(
 		Director:   directoragent.New(llmClient),
 		Prompter:   prompteragent.New(llmClient),
 		Supervisor: supervisoragent.New(llmClient, cfg.SupervisorMin),
-		Image:      imageSvc,
-		Video:      videoSvc,
+		Image:       imageSvc,
+		Video:       videoSvc,
+		Subtitles:   subtitlesSvc,
+		Postprocess: postprocessProc,
 	}), nil
 }

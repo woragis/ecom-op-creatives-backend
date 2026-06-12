@@ -21,6 +21,7 @@ import (
 	"github.com/woragis/ecom-op-creatives-backend/server/internal/config"
 	"github.com/woragis/ecom-op-creatives-backend/server/internal/media/elevenlabs"
 	imagemedia "github.com/woragis/ecom-op-creatives-backend/server/internal/media/image"
+	postprocessmedia "github.com/woragis/ecom-op-creatives-backend/server/internal/media/postprocess"
 	rendermedia "github.com/woragis/ecom-op-creatives-backend/server/internal/media/render"
 	"github.com/woragis/ecom-op-creatives-backend/server/internal/media/storage"
 	"github.com/woragis/ecom-op-creatives-backend/server/internal/media/subtitles"
@@ -45,6 +46,8 @@ type Executor struct {
 	supervisor *supervisoragent.Agent
 	image      *imagemedia.Service
 	video      *video.Service
+	subtitles  *subtitles.Service
+	postprocess *postprocessmedia.Processor
 }
 
 type Deps struct {
@@ -60,8 +63,10 @@ type Deps struct {
 	Director   *directoragent.Agent
 	Prompter   *prompteragent.Agent
 	Supervisor *supervisoragent.Agent
-	Image      *imagemedia.Service
-	Video      *video.Service
+	Image       *imagemedia.Service
+	Video       *video.Service
+	Subtitles   *subtitles.Service
+	Postprocess *postprocessmedia.Processor
 }
 
 func New(d Deps) *Executor {
@@ -71,6 +76,7 @@ func New(d Deps) *Executor {
 		research: d.Research, hooks: d.Hooks, script: d.Script,
 		director: d.Director, prompter: d.Prompter, supervisor: d.Supervisor,
 		image: d.Image, video: d.Video,
+		subtitles: d.Subtitles, postprocess: d.Postprocess,
 	}
 }
 
@@ -321,10 +327,29 @@ func (e *Executor) stepVideo(ctx context.Context, rc *runContext) ([]byte, error
 }
 
 func (e *Executor) stepSubtitles(ctx context.Context, rc *runContext) ([]byte, error) {
-	_ = ctx
 	var script *scriptwriter.Output
 	_ = json.Unmarshal(rc.outputs["script"], &script)
-	out := subtitles.FromScript(script)
+	audioPath := e.storage.FilePath(rc.run.ID.String(), "narration.mp3")
+
+	var out *subtitles.Output
+	if e.subtitles != nil {
+		res, err := e.subtitles.Generate(ctx, audioPath, script)
+		if err != nil {
+			return nil, err
+		}
+		out = res.Output
+	} else {
+		out = subtitles.FromScript(script)
+		out.Source = "script"
+	}
+
+	srtBytes := subtitles.ToSRT(out)
+	if len(srtBytes) > 0 {
+		if _, err := e.storage.WriteFile(rc.run.ID.String(), "captions.srt", srtBytes); err != nil {
+			return nil, err
+		}
+		out.SRTURL = e.storage.PublicPath(rc.run.ID.String(), "captions.srt")
+	}
 	return json.Marshal(out)
 }
 
@@ -341,15 +366,18 @@ func (e *Executor) stepRender(ctx context.Context, rc *runContext) ([]byte, erro
 	narrationURL, _ := voice["publicUrl"].(string)
 	var videoOut *video.StepOutput
 	_ = json.Unmarshal(rc.outputs["video"], &videoOut)
+	introClip := introClipURL(rc.assets)
 	manifest := rendermedia.BuildManifest(rendermedia.Input{
-		RunID:        rc.run.ID.String(),
-		ProductName:  rc.product.Name,
-		NarrationURL: narrationURL,
-		IntroClip:    introClipURL(rc.assets),
-		Script:       script,
-		Director:     dir,
-		Captions:     caps,
-		SceneVideos:  video.ClipsBySceneID(videoOut),
+		RunID:           rc.run.ID.String(),
+		ProductName:     rc.product.Name,
+		NarrationURL:    narrationURL,
+		IntroClip:       introClip,
+		IntroDurationMs: e.cfg.IntroDurationMs,
+		MediaBaseURL:    e.cfg.APIPublicURL,
+		Script:          script,
+		Director:        dir,
+		Captions:        caps,
+		SceneVideos:     video.ClipsBySceneID(videoOut),
 	})
 	manifestBytes, err := manifest.JSON()
 	if err != nil {
@@ -366,23 +394,30 @@ func (e *Executor) stepRender(ctx context.Context, rc *runContext) ([]byte, erro
 	}
 
 	return json.Marshal(map[string]any{
-		"manifestPath": manifestPath,
-		"draftUrl":     e.storage.PublicPath(rc.run.ID.String(), "draft.mp4"),
-		"format":       dir.Format,
+		"manifestPath":    manifestPath,
+		"draftUrl":        e.storage.PublicPath(rc.run.ID.String(), "draft.mp4"),
+		"format":          dir.Format,
+		"durationMs":      manifest.TotalDurationMs(),
+		"introDurationMs": manifest.IntroDurationMs,
 	})
 }
 
 func (e *Executor) runRender(ctx context.Context, manifestPath, outputPath string) error {
-	if os.Getenv("RENDER_MOCK") == "1" || os.Getenv("RENDER_MOCK") == "true" {
+	if e.cfg.RenderMock {
 		return os.WriteFile(outputPath, []byte("MOCK_MP4_PHASE1"), 0o644)
 	}
 	renderDir := e.cfg.RenderDir
 	script := filepath.Join(renderDir, "scripts", "render.mjs")
 	if _, err := os.Stat(script); err != nil {
-		return os.WriteFile(outputPath, []byte("MOCK_MP4_PHASE1"), 0o644)
+		return fmt.Errorf("render script not found: %s", script)
 	}
 	cmd := exec.CommandContext(ctx, "node", script, manifestPath, outputPath)
 	cmd.Dir = renderDir
+	cmd.Env = append(os.Environ(),
+		"API_PUBLIC_URL="+e.cfg.APIPublicURL,
+		"STORAGE_DIR="+e.cfg.StorageDir,
+		"RENDER_MOCK=0",
+	)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("remotion render: %w: %s", err, string(out))
@@ -391,24 +426,26 @@ func (e *Executor) runRender(ctx context.Context, manifestPath, outputPath strin
 }
 
 func (e *Executor) stepPostprocess(ctx context.Context, rc *runContext) ([]byte, error) {
-	_ = ctx
 	draftPath := e.storage.FilePath(rc.run.ID.String(), "draft.mp4")
 	finalPath := e.storage.FilePath(rc.run.ID.String(), "final.mp4")
+	thumbPath := e.storage.FilePath(rc.run.ID.String(), "thumbnail.jpg")
 
-	data, err := os.ReadFile(draftPath)
+	var ppResult *postprocessmedia.Result
+	var err error
+	if e.postprocess != nil {
+		ppResult, err = e.postprocess.Process(ctx, draftPath, finalPath, thumbPath)
+	} else {
+		ppResult, err = postprocessmedia.New(e.cfg).Process(ctx, draftPath, finalPath, thumbPath)
+	}
 	if err != nil {
 		return nil, err
 	}
-	if err := os.WriteFile(finalPath, data, 0o644); err != nil {
-		return nil, err
-	}
-
-	thumbPath := e.storage.FilePath(rc.run.ID.String(), "thumbnail.jpg")
-	_ = os.WriteFile(thumbPath, []byte("MOCK_JPG"), 0o644)
 
 	return json.Marshal(map[string]any{
-		"finalVideoUrl": e.storage.PublicPath(rc.run.ID.String(), "final.mp4"),
-		"thumbnailUrl":  e.storage.PublicPath(rc.run.ID.String(), "thumbnail.jpg"),
+		"finalVideoUrl":   e.storage.PublicPath(rc.run.ID.String(), "final.mp4"),
+		"thumbnailUrl":    e.storage.PublicPath(rc.run.ID.String(), "thumbnail.jpg"),
+		"loudnessApplied": ppResult.LoudnessApplied,
+		"thumbnailFrom":   ppResult.ThumbnailFrom,
 	})
 }
 

@@ -65,6 +65,14 @@ DATABASE_URL=postgres://creatives:creatives@localhost:5432/creatives?sslmode=dis
   go test -tags=integration ./internal/product/repository/...
 ```
 
+## Phase 5 — Qualidade de saída
+
+- Subtitles: OpenAI Whisper (word-level) + `captions.srt`, fallback script timing
+- `SUBTITLES_MOCK=1` for dev without API
+- Remotion render strict when `RENDER_MOCK=0` (`npm install` in `worker-render/`)
+- Intro clip offsets scenes + captions in manifest (`INTRO_DURATION_MS`)
+- FFmpeg postprocess: loudness normalization + thumbnail (`POSTPROCESS_MOCK=1` for dev)
+
 ## Phase 4 — Reprocessamento
 
 - `PATCH /v1/creative-runs/{id}/steps/{stepId}` — edit `outputJson`, optional reprocess
