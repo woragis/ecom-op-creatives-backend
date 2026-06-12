@@ -43,9 +43,26 @@ handler → service → repository
 
 ```bash
 cp .env.example .env
-docker compose up -d postgres rabbitmq minio
-cd server && go run ./cmd/server
+docker compose up -d
+make migrate
+make dev          # API on :8080
+make worker-stub  # pipeline stub worker (separate terminal)
 ```
+
+Integration tests:
+
+```bash
+DATABASE_URL=postgres://creatives:creatives@localhost:5432/creatives?sslmode=disable \
+  go test -tags=integration ./internal/product/repository/...
+```
+
+## Phase 0 entregue
+
+- Go API: `GET /health`, `GET /ready`
+- CRUD products + creative runs
+- Pipeline com 12 steps + RabbitMQ enqueue
+- Worker stub (`cmd/worker-stub`) marca steps como done
+- Migrations SQL + AutoMigrate
 
 ## Documentação
 
