@@ -26,7 +26,7 @@ func NewRegistry(cfg config.Config) *Registry {
 		r.providers["flux"] = NewFlux(cfg.FluxAPIKey, cfg.FluxAPIBase)
 	}
 	if cfg.OpenAIKey != "" {
-		r.providers["dalle"] = NewDalle(cfg.OpenAIKey)
+		r.providers["dalle"] = NewDalle(cfg.OpenAIKey, cfg.OpenAIImageModel)
 	}
 	if cfg.IdeogramAPIKey != "" {
 		r.providers["ideogram"] = NewIdeogram(cfg.IdeogramAPIKey)
