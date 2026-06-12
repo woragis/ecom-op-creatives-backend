@@ -18,7 +18,13 @@ func TestServiceImage2VideoMock(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	cfg := config.Config{VideoMock: true, VideoMaxScenes: 1, VideoPollIntervalSec: 1, VideoMaxPollMin: 1}
+	cfg := config.Config{
+		VideoMock:            true,
+		VideoMaxScenes:       1,
+		VideoPollIntervalSec: 1,
+		VideoMaxPollMin:      1,
+		APIPublicURL:         "https://cdn.example.com",
+	}
 	svc := NewService(cfg, NewRegistry(cfg), store)
 
 	imageOut := &imagemedia.StepOutput{

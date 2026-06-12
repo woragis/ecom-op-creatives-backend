@@ -26,7 +26,10 @@ func NewRegistry(cfg config.Config) *Registry {
 		r.providers["kling"] = NewKling(cfg.KlingAPIKey, cfg.KlingAPIBase)
 	}
 	if cfg.RunwayAPIKey != "" {
-		r.providers["runway"] = NewRunway(cfg.RunwayAPIKey, cfg.RunwayAPIBase)
+		r.providers["runway"] = NewRunway(cfg.RunwayAPIKey, cfg.RunwayAPIBase, runwayConfig{
+			textModel:  cfg.RunwayTextModel,
+			imageModel: cfg.RunwayImageModel,
+		})
 	}
 	if cfg.LumaAPIKey != "" {
 		r.providers["luma"] = NewLuma(cfg.LumaAPIKey, cfg.LumaAPIBase)
