@@ -189,3 +189,36 @@ func (h *creativeRunHandler) reprocess(w http.ResponseWriter, r *http.Request) {
 	}
 	writeJSON(w, http.StatusOK, run)
 }
+
+func (h *creativeRunHandler) approve(w http.ResponseWriter, r *http.Request) {
+	id, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		writeServiceError(w, err)
+		return
+	}
+	run, err := h.svc.ApproveRun(r.Context(), id)
+	if err != nil {
+		writeServiceError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, run)
+}
+
+func (h *creativeRunHandler) retryStep(w http.ResponseWriter, r *http.Request) {
+	runID, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		writeServiceError(w, err)
+		return
+	}
+	stepID, err := uuid.Parse(r.PathValue("stepId"))
+	if err != nil {
+		writeServiceError(w, err)
+		return
+	}
+	run, err := h.svc.RetryStep(r.Context(), runID, stepID)
+	if err != nil {
+		writeServiceError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, run)
+}

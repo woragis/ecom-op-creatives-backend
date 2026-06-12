@@ -208,3 +208,14 @@ func (r *Repository) ResetStepsFromOrder(ctx context.Context, runID uuid.UUID, f
 		Where("creative_run_id = ? AND step_order >= ?", runID, fromOrder).
 		Updates(resetStepFields()).Error
 }
+
+func (r *Repository) ResetStepForRetry(ctx context.Context, stepID uuid.UUID) error {
+	return r.db.WithContext(ctx).Model(&models.PipelineStep{}).
+		Where("id = ?", stepID).
+		Updates(map[string]any{
+			"status":        models.StepStatusPending,
+			"error_message": nil,
+			"started_at":    nil,
+			"completed_at":  nil,
+		}).Error
+}

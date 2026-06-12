@@ -65,6 +65,12 @@ DATABASE_URL=postgres://creatives:creatives@localhost:5432/creatives?sslmode=dis
   go test -tags=integration ./internal/product/repository/...
 ```
 
+## Phase 6 — Production UI APIs
+
+- `POST /v1/creative-runs/{id}/approve` — mark run `approved` from `needs_review`
+- `POST /v1/creative-runs/{id}/steps/{stepId}/retry` — retry a failed step, reset downstream, re-enqueue
+- Frontend: pipeline stepper, scene timeline, inline media previews, live polling, approve/retry actions
+
 ## Phase 5 — Qualidade de saída
 
 - Subtitles: OpenAI Whisper (word-level) + `captions.srt`, fallback script timing

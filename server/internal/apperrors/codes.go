@@ -33,4 +33,10 @@ const (
 
 	CodeCreativeRunReprocessInvalid = "CREATIVE_RUN_REPROCESS_V1_SERVICE_INVALID"
 	MsgCreativeRunReprocessInvalid  = "Run cannot be reprocessed in its current state"
+
+	CodeCreativeRunApproveInvalid = "CREATIVE_RUN_APPROVE_V1_SERVICE_INVALID"
+	MsgCreativeRunApproveInvalid  = "Run cannot be approved in its current state"
+
+	CodeCreativeRunRetryInvalid = "CREATIVE_RUN_RETRY_V1_SERVICE_INVALID"
+	MsgCreativeRunRetryInvalid  = "Step cannot be retried in its current state"
 )
