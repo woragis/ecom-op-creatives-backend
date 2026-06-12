@@ -8,6 +8,8 @@ import (
 	"io"
 	"net/http"
 	"time"
+
+	"github.com/woragis/ecom-op-creatives-backend/server/internal/platform/applog"
 )
 
 const openAISpeechURL = "https://api.openai.com/v1/audio/speech"
@@ -35,6 +37,10 @@ func NewOpenAI(apiKey, model, voice string) *OpenAI {
 }
 
 func (o *OpenAI) Synthesize(ctx context.Context, text string) ([]byte, error) {
+	started := time.Now()
+	log := applog.FromContext(ctx).With("service", "openai", "operation", "audio.speech", "model", o.model, "voice", o.voice)
+	log.Info("openai tts request", "text_chars", len(text), "text_preview", applog.Truncate(text, 120))
+
 	body, err := json.Marshal(map[string]string{
 		"model":           o.model,
 		"input":           text,
@@ -61,7 +67,16 @@ func (o *OpenAI) Synthesize(ctx context.Context, text string) ([]byte, error) {
 		return nil, err
 	}
 	if res.StatusCode >= 400 {
+		log.Error("openai tts failed",
+			"status", res.StatusCode,
+			"duration_ms", time.Since(started).Milliseconds(),
+			"body_preview", applog.Truncate(string(raw), 300),
+		)
 		return nil, fmt.Errorf("openai tts http %d: %s", res.StatusCode, string(raw))
 	}
+	log.Info("openai tts completed",
+		"duration_ms", time.Since(started).Milliseconds(),
+		"bytes", len(raw),
+	)
 	return raw, nil
 }

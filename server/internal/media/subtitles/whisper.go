@@ -12,6 +12,8 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/woragis/ecom-op-creatives-backend/server/internal/platform/applog"
 )
 
 type whisperClient struct {
@@ -39,6 +41,10 @@ type whisperVerbose struct {
 }
 
 func (w *whisperClient) Transcribe(ctx context.Context, audioPath string) (*Output, error) {
+	started := time.Now()
+	log := applog.FromContext(ctx).With("service", "openai", "operation", "audio.transcriptions", "model", "whisper-1")
+	log.Info("whisper transcribe", "audio_path", audioPath)
+
 	f, err := os.Open(audioPath)
 	if err != nil {
 		return nil, err
@@ -78,6 +84,11 @@ func (w *whisperClient) Transcribe(ctx context.Context, audioPath string) (*Outp
 		return nil, err
 	}
 	if res.StatusCode >= 400 {
+		log.Error("whisper transcribe failed",
+			"status", res.StatusCode,
+			"duration_ms", time.Since(started).Milliseconds(),
+			"body_preview", applog.Truncate(string(raw), 300),
+		)
 		return nil, fmt.Errorf("whisper http %d: %s", res.StatusCode, string(raw))
 	}
 
@@ -85,7 +96,12 @@ func (w *whisperClient) Transcribe(ctx context.Context, audioPath string) (*Outp
 	if err := json.Unmarshal(raw, &parsed); err != nil {
 		return nil, err
 	}
-	return wordsFromWhisper(parsed), nil
+	out := wordsFromWhisper(parsed)
+	log.Info("whisper transcribe completed",
+		"duration_ms", time.Since(started).Milliseconds(),
+		"words", len(out.Words),
+	)
+	return out, nil
 }
 
 func wordsFromWhisper(v whisperVerbose) *Output {
