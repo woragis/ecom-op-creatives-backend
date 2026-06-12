@@ -94,7 +94,7 @@ export const UGCVertical: React.FC<{ manifest: Manifest }> = ({ manifest }) => {
           {activeWords.length > 0
             ? activeWords.map((w, i) => (
                 <span
-                  key={`${w.text}-${i}`}
+                  key={`${w.startMs}-${w.text}-${i}`}
                   style={{
                     color: i === activeWords.length - 1 ? "#FFE066" : "white",
                     marginRight: 12,
@@ -103,7 +103,7 @@ export const UGCVertical: React.FC<{ manifest: Manifest }> = ({ manifest }) => {
                   {w.text}
                 </span>
               ))
-            : scene?.narration ?? manifest.productName}
+            : null}
         </div>
       </AbsoluteFill>
 
