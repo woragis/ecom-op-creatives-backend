@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -29,6 +30,7 @@ import (
 	"github.com/woragis/ecom-op-creatives-backend/server/internal/models"
 	pipelinesvc "github.com/woragis/ecom-op-creatives-backend/server/internal/pipeline/service"
 	"github.com/woragis/ecom-op-creatives-backend/server/internal/platform/applog"
+	"github.com/woragis/ecom-op-creatives-backend/server/internal/platform/runctx"
 	productrepo "github.com/woragis/ecom-op-creatives-backend/server/internal/product/repository"
 	"time"
 )
@@ -98,6 +100,10 @@ func (e *Executor) ProcessStep(ctx context.Context, stepID uuid.UUID) error {
 	if step.Status == models.StepStatusDone {
 		return e.advance(ctx, step)
 	}
+	if step.Status == models.StepStatusFailed {
+		log.Warn("ignoring stale queue message for failed step")
+		return nil
+	}
 
 	if err := e.repo.MarkStepRunning(ctx, stepID); err != nil {
 		return err
@@ -108,15 +114,13 @@ func (e *Executor) ProcessStep(ctx context.Context, stepID uuid.UUID) error {
 
 	rc, err := e.loadContext(ctx, step.CreativeRunID)
 	if err != nil {
-		return err
+		return e.failStep(ctx, step, log, started, err)
 	}
 
-	output, err := e.executeStep(ctx, step.StepType, rc)
+	stepCtx := runctx.With(ctx, step.CreativeRunID.String(), stepID.String(), step.StepType)
+	output, err := e.executeStep(stepCtx, step.StepType, rc)
 	if err != nil {
-		_ = e.storage.WriteStepErrorArtifact(step.CreativeRunID.String(), step.StepType, err.Error())
-		_ = e.repo.FailStep(ctx, stepID, err.Error())
-		log.Error("step failed", "error", err.Error(), "duration_ms", time.Since(started).Milliseconds())
-		return err
+		return e.failStep(ctx, step, log, started, err)
 	}
 
 	provider := extractProvider(output)
@@ -130,6 +134,15 @@ func (e *Executor) ProcessStep(ctx context.Context, stepID uuid.UUID) error {
 	}
 	log.Info("step completed", attrs...)
 	return e.advance(ctx, step)
+}
+
+func (e *Executor) failStep(ctx context.Context, step *models.PipelineStep, log *slog.Logger, started time.Time, err error) error {
+	msg := err.Error()
+	_ = e.storage.WriteStepErrorArtifact(step.CreativeRunID.String(), step.StepType, msg)
+	_ = e.repo.FailStep(ctx, step.ID, msg)
+	_ = e.repo.UpdateRunStatus(ctx, step.CreativeRunID, models.RunStatusFailed)
+	log.Error("step failed", "error", msg, "duration_ms", time.Since(started).Milliseconds())
+	return nil
 }
 
 func (e *Executor) advance(ctx context.Context, step *models.PipelineStep) error {
@@ -222,6 +235,7 @@ func (e *Executor) executeStep(ctx context.Context, stepType string, rc *runCont
 func (e *Executor) stepResearch(ctx context.Context, rc *runContext) ([]byte, error) {
 	out, err := e.research.Execute(ctx, research.Input{
 		ProductName: rc.product.Name,
+		Description: rc.product.Description,
 		ProductURL:  rc.product.URL,
 		Niche:       rc.product.Niche,
 	})
@@ -238,6 +252,7 @@ func (e *Executor) stepHooks(ctx context.Context, rc *runContext) ([]byte, error
 	}
 	out, err := e.hooks.Execute(ctx, hooksagent.Input{
 		ProductName: rc.product.Name,
+		Description: rc.product.Description,
 		Research:    res,
 		UserHook:    rc.run.Hook,
 	})
@@ -254,6 +269,7 @@ func (e *Executor) stepScript(ctx context.Context, rc *runContext) ([]byte, erro
 	_ = json.Unmarshal(rc.outputs["hooks"], &hook)
 	out, err := e.script.Execute(ctx, scriptwriter.Input{
 		ProductName: rc.product.Name,
+		Description: rc.product.Description,
 		Research:    res,
 		Hook:        hook,
 	})
@@ -279,9 +295,10 @@ func (e *Executor) stepPrompter(ctx context.Context, rc *runContext) ([]byte, er
 	_ = json.Unmarshal(rc.outputs["script"], &script)
 	_ = json.Unmarshal(rc.outputs["director"], &dir)
 	out, err := e.prompter.Execute(ctx, prompteragent.Input{
-		Script:   script,
-		Director: dir,
-		Product:  rc.product.Name,
+		Script:      script,
+		Director:    dir,
+		Product:     rc.product.Name,
+		Description: rc.product.Description,
 	})
 	if err != nil {
 		return nil, err
@@ -421,7 +438,7 @@ func (e *Executor) stepRender(ctx context.Context, rc *runContext) ([]byte, erro
 	}
 
 	outputPath := e.storage.FilePath(rc.run.ID.String(), "draft.mp4")
-	if err := e.runRender(ctx, manifestPath, outputPath); err != nil {
+	if err := e.runRender(ctx, rc.run.ID.String(), manifestPath, outputPath); err != nil {
 		return nil, err
 	}
 
@@ -434,8 +451,10 @@ func (e *Executor) stepRender(ctx context.Context, rc *runContext) ([]byte, erro
 	})
 }
 
-func (e *Executor) runRender(ctx context.Context, manifestPath, outputPath string) error {
+func (e *Executor) runRender(ctx context.Context, runID, manifestPath, outputPath string) error {
+	log := applog.FromContext(ctx).With("service", "remotion", "operation", "render")
 	if e.cfg.RenderMock {
+		log.Info("remotion render mock", "output", outputPath)
 		return os.WriteFile(outputPath, []byte("MOCK_MP4_PHASE1"), 0o644)
 	}
 	renderDir := e.cfg.RenderDir
@@ -443,17 +462,37 @@ func (e *Executor) runRender(ctx context.Context, manifestPath, outputPath strin
 	if _, err := os.Stat(script); err != nil {
 		return fmt.Errorf("render script not found: %s", script)
 	}
+	logDir := e.storage.LogsDir(runID)
+	if err := os.MkdirAll(logDir, 0o755); err != nil {
+		return err
+	}
+	logPath := filepath.Join(logDir, "render.log")
+	started := time.Now()
+	log.Info("remotion render started", "manifest", manifestPath, "output", outputPath, "log_path", logPath)
+
 	cmd := exec.CommandContext(ctx, "node", script, manifestPath, outputPath)
 	cmd.Dir = renderDir
 	cmd.Env = append(os.Environ(),
 		"API_PUBLIC_URL="+e.cfg.MediaBaseURL(),
 		"STORAGE_DIR="+e.cfg.StorageDir,
+		"CREATIVE_RUN_ID="+runID,
+		"RENDER_LOG_PATH="+logPath,
 		"RENDER_MOCK=0",
 	)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
+		log.Error("remotion render failed",
+			"duration_ms", time.Since(started).Milliseconds(),
+			"output_preview", applog.Truncate(string(out), 500),
+			"log_path", logPath,
+		)
 		return fmt.Errorf("remotion render: %w: %s", err, string(out))
 	}
+	log.Info("remotion render completed",
+		"duration_ms", time.Since(started).Milliseconds(),
+		"output", outputPath,
+		"log_path", logPath,
+	)
 	return nil
 }
 
