@@ -68,7 +68,7 @@ func main() {
 	runRepo := creativerunrepo.New(db)
 	productRepo := productrepo.New(db)
 	pipelineSvc := pipelinesvc.New(mq)
-	runSvc := creativerunsvc.New(runRepo, productRepo, pipelineSvc)
+	runSvc := creativerunsvc.New(runRepo, productRepo, pipelineSvc, nil)
 
 	for _, queue := range pipeline.AllQueues() {
 		q := queue

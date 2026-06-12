@@ -11,6 +11,7 @@ import (
 	"github.com/woragis/ecom-op-creatives-backend/server/internal/models"
 	pipelinesvc "github.com/woragis/ecom-op-creatives-backend/server/internal/pipeline/service"
 	productrepo "github.com/woragis/ecom-op-creatives-backend/server/internal/product/repository"
+	"github.com/woragis/ecom-op-creatives-backend/server/internal/media/storage"
 	"github.com/woragis/ecom-op-creatives-backend/server/internal/pipeline"
 )
 
@@ -18,10 +19,11 @@ type Service struct {
 	repo        *creativerunrepo.Repository
 	products    *productrepo.Repository
 	pipelineSvc *pipelinesvc.Service
+	storage     *storage.Local
 }
 
-func New(repo *creativerunrepo.Repository, products *productrepo.Repository, pipelineSvc *pipelinesvc.Service) *Service {
-	return &Service{repo: repo, products: products, pipelineSvc: pipelineSvc}
+func New(repo *creativerunrepo.Repository, products *productrepo.Repository, pipelineSvc *pipelinesvc.Service, store *storage.Local) *Service {
+	return &Service{repo: repo, products: products, pipelineSvc: pipelineSvc, storage: store}
 }
 
 type CreateInput struct {
@@ -29,6 +31,13 @@ type CreateInput struct {
 	CampaignID    *uuid.UUID
 	Hook          *string
 	VideoProvider string
+	ImageProvider string
+}
+
+var validAssetTypes = map[string]bool{
+	"persona": true,
+	"product": true,
+	"intro":   true,
 }
 
 func (s *Service) Create(ctx context.Context, in CreateInput) (*models.CreativeRun, error) {
@@ -42,18 +51,28 @@ func (s *Service) Create(ctx context.Context, in CreateInput) (*models.CreativeR
 		return nil, err
 	}
 
-	provider := strings.TrimSpace(in.VideoProvider)
-	if provider == "" {
-		provider = pipeline.DefaultVideoProvider()
+	videoProvider := strings.TrimSpace(in.VideoProvider)
+	if videoProvider == "" {
+		videoProvider = pipeline.DefaultVideoProvider()
 	}
-	if !pipeline.ValidVideoProvider(provider) {
+	if !pipeline.ValidVideoProvider(videoProvider) {
+		return nil, apperrors.Invalid(apperrors.CodeCreativeRunCreateInvalidBody, apperrors.MsgCreativeRunCreateInvalidBody)
+	}
+
+	imageProvider := strings.TrimSpace(in.ImageProvider)
+	if imageProvider == "" {
+		imageProvider = pipeline.DefaultImageProvider()
+	}
+	if !pipeline.ValidImageProvider(imageProvider) {
 		return nil, apperrors.Invalid(apperrors.CodeCreativeRunCreateInvalidBody, apperrors.MsgCreativeRunCreateInvalidBody)
 	}
 
 	run := &models.CreativeRun{
 		ProductID:     in.ProductID,
 		CampaignID:    in.CampaignID,
-		VideoProvider: provider,
+		VideoProvider: videoProvider,
+		ImageProvider: imageProvider,
+		InputAssets:   (&models.RunAssets{}).JSON(),
 		Status:        models.RunStatusDraft,
 		Hook:          in.Hook,
 	}
@@ -85,6 +104,39 @@ func (s *Service) List(ctx context.Context) ([]models.CreativeRun, error) {
 
 func (s *Service) GetByID(ctx context.Context, id uuid.UUID) (*models.CreativeRun, error) {
 	return s.repo.GetByID(ctx, id)
+}
+
+func (s *Service) UploadAsset(ctx context.Context, runID uuid.UUID, assetType string, data []byte, ext string) (*models.RunAssets, error) {
+	if s.storage == nil {
+		return nil, apperrors.Invalid(apperrors.CodeCreativeRunCreateInvalidBody, "storage not configured")
+	}
+	if !validAssetTypes[assetType] {
+		return nil, apperrors.Invalid(apperrors.CodeCreativeRunCreateInvalidBody, apperrors.MsgCreativeRunCreateInvalidBody)
+	}
+	run, err := s.repo.GetByID(ctx, runID)
+	if err != nil {
+		return nil, err
+	}
+	if run.Status != models.RunStatusDraft && run.Status != models.RunStatusFailed {
+		return nil, apperrors.ConflictErr(apperrors.CodeCreativeRunStartInvalidState, apperrors.MsgCreativeRunStartInvalidState)
+	}
+	_, publicURL, err := s.storage.WriteInputFile(runID.String(), assetType, ext, data)
+	if err != nil {
+		return nil, apperrors.Wrapf(err, "upload asset")
+	}
+	assets := models.ParseRunAssets(run.InputAssets)
+	switch assetType {
+	case "persona":
+		assets.PersonaImage = publicURL
+	case "product":
+		assets.ProductImage = publicURL
+	case "intro":
+		assets.IntroClip = publicURL
+	}
+	if err := s.repo.UpdateInputAssets(ctx, runID, assets.JSON()); err != nil {
+		return nil, apperrors.Wrapf(err, "update input assets")
+	}
+	return assets, nil
 }
 
 func (s *Service) Start(ctx context.Context, id uuid.UUID) (*models.CreativeRun, error) {

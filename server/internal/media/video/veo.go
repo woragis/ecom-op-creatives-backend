@@ -13,10 +13,12 @@ func NewVeo(apiKey, baseURL string) Provider {
 }
 
 func veoSubmit(ctx context.Context, p *HTTPProvider, req SceneRequest) (*Job, error) {
+	instance := map[string]any{"prompt": req.Prompt}
+	if req.Mode == ModeImage2Video && req.ImageURL != "" {
+		instance["image"] = map[string]any{"uri": req.ImageURL}
+	}
 	body := map[string]any{
-		"instances": []map[string]any{
-			{"prompt": req.Prompt},
-		},
+		"instances": []map[string]any{instance},
 		"parameters": map[string]any{
 			"aspectRatio": req.AspectRatio,
 			"durationSeconds": req.DurationSec,

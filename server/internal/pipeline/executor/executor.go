@@ -20,6 +20,7 @@ import (
 	creativerunrepo "github.com/woragis/ecom-op-creatives-backend/server/internal/creativerun/repository"
 	"github.com/woragis/ecom-op-creatives-backend/server/internal/config"
 	"github.com/woragis/ecom-op-creatives-backend/server/internal/media/elevenlabs"
+	imagemedia "github.com/woragis/ecom-op-creatives-backend/server/internal/media/image"
 	rendermedia "github.com/woragis/ecom-op-creatives-backend/server/internal/media/render"
 	"github.com/woragis/ecom-op-creatives-backend/server/internal/media/storage"
 	"github.com/woragis/ecom-op-creatives-backend/server/internal/media/subtitles"
@@ -42,6 +43,7 @@ type Executor struct {
 	director  *directoragent.Agent
 	prompter  *prompteragent.Agent
 	supervisor *supervisoragent.Agent
+	image      *imagemedia.Service
 	video      *video.Service
 }
 
@@ -58,6 +60,7 @@ type Deps struct {
 	Director   *directoragent.Agent
 	Prompter   *prompteragent.Agent
 	Supervisor *supervisoragent.Agent
+	Image      *imagemedia.Service
 	Video      *video.Service
 }
 
@@ -67,7 +70,7 @@ func New(d Deps) *Executor {
 		storage: d.Storage, tts: d.TTS,
 		research: d.Research, hooks: d.Hooks, script: d.Script,
 		director: d.Director, prompter: d.Prompter, supervisor: d.Supervisor,
-		video: d.Video,
+		image: d.Image, video: d.Video,
 	}
 }
 
@@ -75,6 +78,7 @@ type runContext struct {
 	run     *models.CreativeRun
 	product *models.Product
 	outputs map[string]json.RawMessage
+	assets  *models.RunAssets
 }
 
 func (e *Executor) ProcessStep(ctx context.Context, stepID uuid.UUID) error {
@@ -140,7 +144,10 @@ func (e *Executor) loadContext(ctx context.Context, runID uuid.UUID) (*runContex
 			outputs[s.StepType] = append([]byte(nil), s.OutputJSON...)
 		}
 	}
-	return &runContext{run: run, product: product, outputs: outputs}, nil
+	return &runContext{
+		run: run, product: product, outputs: outputs,
+		assets: models.ParseRunAssets(run.InputAssets),
+	}, nil
 }
 
 func (e *Executor) executeStep(ctx context.Context, stepType string, rc *runContext) ([]byte, error) {
@@ -265,11 +272,26 @@ func (e *Executor) stepVoice(ctx context.Context, rc *runContext) ([]byte, error
 }
 
 func (e *Executor) stepImage(ctx context.Context, rc *runContext) ([]byte, error) {
-	_ = ctx
-	return json.Marshal(map[string]any{
-		"skipped": true,
-		"reason":  "phase1-uses-remotion-backgrounds",
-	})
+	if e.image == nil {
+		return json.Marshal(map[string]any{
+			"skipped": true,
+			"reason":  "image service not configured",
+		})
+	}
+	var prompterOut *prompteragent.Output
+	var script *scriptwriter.Output
+	var dir *directoragent.Output
+	_ = json.Unmarshal(rc.outputs["prompter"], &prompterOut)
+	_ = json.Unmarshal(rc.outputs["script"], &script)
+	_ = json.Unmarshal(rc.outputs["director"], &dir)
+	if prompterOut == nil || script == nil {
+		return nil, fmt.Errorf("missing prompter or script output")
+	}
+	out, err := e.image.GenerateScenes(ctx, rc.run.ImageProvider, rc.run.ID.String(), prompterOut, script, dir, rc.assets)
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(out)
 }
 
 func (e *Executor) stepVideo(ctx context.Context, rc *runContext) ([]byte, error) {
@@ -282,12 +304,16 @@ func (e *Executor) stepVideo(ctx context.Context, rc *runContext) ([]byte, error
 	}
 	var prompterOut *prompteragent.Output
 	var script *scriptwriter.Output
+	var dir *directoragent.Output
+	var imageOut *imagemedia.StepOutput
 	_ = json.Unmarshal(rc.outputs["prompter"], &prompterOut)
 	_ = json.Unmarshal(rc.outputs["script"], &script)
+	_ = json.Unmarshal(rc.outputs["director"], &dir)
+	_ = json.Unmarshal(rc.outputs["image"], &imageOut)
 	if prompterOut == nil || script == nil {
 		return nil, fmt.Errorf("missing prompter or script output")
 	}
-	out, err := e.video.GenerateScenes(ctx, rc.run.VideoProvider, rc.run.ID.String(), prompterOut, script)
+	out, err := e.video.GenerateScenes(ctx, rc.run.VideoProvider, rc.run.ID.String(), prompterOut, script, dir, imageOut, rc.assets)
 	if err != nil {
 		return nil, err
 	}
@@ -315,7 +341,16 @@ func (e *Executor) stepRender(ctx context.Context, rc *runContext) ([]byte, erro
 	narrationURL, _ := voice["publicUrl"].(string)
 	var videoOut *video.StepOutput
 	_ = json.Unmarshal(rc.outputs["video"], &videoOut)
-	manifest := rendermedia.BuildManifest(rc.run.ID.String(), rc.product.Name, narrationURL, script, dir, caps, video.ClipsBySceneID(videoOut))
+	manifest := rendermedia.BuildManifest(rendermedia.Input{
+		RunID:        rc.run.ID.String(),
+		ProductName:  rc.product.Name,
+		NarrationURL: narrationURL,
+		IntroClip:    introClipURL(rc.assets),
+		Script:       script,
+		Director:     dir,
+		Captions:     caps,
+		SceneVideos:  video.ClipsBySceneID(videoOut),
+	})
 	manifestBytes, err := manifest.JSON()
 	if err != nil {
 		return nil, err
@@ -375,6 +410,13 @@ func (e *Executor) stepPostprocess(ctx context.Context, rc *runContext) ([]byte,
 		"finalVideoUrl": e.storage.PublicPath(rc.run.ID.String(), "final.mp4"),
 		"thumbnailUrl":  e.storage.PublicPath(rc.run.ID.String(), "thumbnail.jpg"),
 	})
+}
+
+func introClipURL(assets *models.RunAssets) string {
+	if assets == nil {
+		return ""
+	}
+	return assets.IntroClip
 }
 
 func (e *Executor) stepSupervisor(ctx context.Context, rc *runContext) ([]byte, error) {

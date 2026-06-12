@@ -19,6 +19,8 @@ import (
 	"github.com/woragis/ecom-op-creatives-backend/server/internal/pipeline"
 	pipelinesvc "github.com/woragis/ecom-op-creatives-backend/server/internal/pipeline/service"
 	"github.com/woragis/ecom-op-creatives-backend/server/internal/config"
+	imagemedia "github.com/woragis/ecom-op-creatives-backend/server/internal/media/image"
+	"github.com/woragis/ecom-op-creatives-backend/server/internal/media/storage"
 	"github.com/woragis/ecom-op-creatives-backend/server/internal/media/video"
 	"github.com/woragis/ecom-op-creatives-backend/server/internal/platform/postgres"
 	"github.com/woragis/ecom-op-creatives-backend/server/internal/platform/rabbitmq"
@@ -77,19 +79,27 @@ func main() {
 
 	cfg := config.Load()
 	videoRegistry := video.NewRegistry(cfg)
+	imageRegistry := imagemedia.NewRegistry(cfg)
+	store, err := storage.NewLocal(cfg.StorageDir)
+	if err != nil {
+		log.Fatalf("storage: %v", err)
+	}
 	productRepository := productrepo.New(db)
 	runRepository := creativerunrepo.New(db)
 	pipelineService := pipelinesvc.New(mq)
-	runService := creativerunsvc.New(runRepository, productRepository, pipelineService)
+	runService := creativerunsvc.New(runRepository, productRepository, pipelineService, store)
 	productService := productsvc.New(productRepository)
 
 	app := &httpserver.App{
-		DB:             db,
-		RabbitMQ:       mq,
-		StorageDir:     cfg.StorageDir,
-		VideoProviders: videoRegistry.Available(),
-		Products:       productService,
-		Runs:           runService,
+		DB:                   db,
+		RabbitMQ:             mq,
+		StorageDir:           cfg.StorageDir,
+		VideoProviders:       videoRegistry.Available(),
+		ImageProviders:       imageRegistry.Available(),
+		DefaultVideoProvider: cfg.VideoProviderDefault,
+		DefaultImageProvider: cfg.ImageProviderDefault,
+		Products:             productService,
+		Runs:                 runService,
 	}
 
 	handler := httpserver.NewHandler(app, middleware.LoadConfigFromEnv())

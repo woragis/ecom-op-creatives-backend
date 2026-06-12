@@ -1,7 +1,10 @@
 package httpserver
 
 import (
+	"io"
 	"net/http"
+	"path/filepath"
+	"strings"
 
 	"github.com/google/uuid"
 	creativerunsvc "github.com/woragis/ecom-op-creatives-backend/server/internal/creativerun/service"
@@ -20,6 +23,7 @@ type createCreativeRunRequest struct {
 	CampaignID    *string `json:"campaignId"`
 	Hook          *string `json:"hook"`
 	VideoProvider string  `json:"videoProvider"`
+	ImageProvider string  `json:"imageProvider"`
 }
 
 func (h *creativeRunHandler) list(w http.ResponseWriter, r *http.Request) {
@@ -56,6 +60,7 @@ func (h *creativeRunHandler) create(w http.ResponseWriter, r *http.Request) {
 		CampaignID:    campaignID,
 		Hook:          req.Hook,
 		VideoProvider: req.VideoProvider,
+		ImageProvider: req.ImageProvider,
 	})
 	if err != nil {
 		writeServiceError(w, err)
@@ -90,4 +95,35 @@ func (h *creativeRunHandler) start(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, run)
+}
+
+func (h *creativeRunHandler) uploadAsset(w http.ResponseWriter, r *http.Request) {
+	id, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		writeServiceError(w, err)
+		return
+	}
+	assetType := strings.TrimSpace(r.PathValue("type"))
+	if err := r.ParseMultipartForm(32 << 20); err != nil {
+		writeServiceError(w, err)
+		return
+	}
+	file, header, err := r.FormFile("file")
+	if err != nil {
+		writeServiceError(w, err)
+		return
+	}
+	defer file.Close()
+	data, err := io.ReadAll(file)
+	if err != nil {
+		writeServiceError(w, err)
+		return
+	}
+	ext := filepath.Ext(header.Filename)
+	assets, err := h.svc.UploadAsset(r.Context(), id, assetType, data, ext)
+	if err != nil {
+		writeServiceError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, assets)
 }

@@ -13,10 +13,15 @@ func NewKling(apiKey, baseURL string) Provider {
 }
 
 func klingSubmit(ctx context.Context, p *HTTPProvider, req SceneRequest) (*Job, error) {
+	path := "/v1/videos/text2video"
 	body := map[string]any{
 		"prompt":       req.Prompt,
 		"aspect_ratio": req.AspectRatio,
 		"duration":     fmt.Sprintf("%d", req.DurationSec),
+	}
+	if req.Mode == ModeImage2Video && req.ImageURL != "" {
+		path = "/v1/videos/image2video"
+		body["image"] = req.ImageURL
 	}
 	var resp struct {
 		Data struct {
@@ -24,7 +29,7 @@ func klingSubmit(ctx context.Context, p *HTTPProvider, req SceneRequest) (*Job, 
 		} `json:"data"`
 		TaskID string `json:"task_id"`
 	}
-	if err := p.postJSON(ctx, "/v1/videos/text2video", body, &resp); err != nil {
+	if err := p.postJSON(ctx, path, body, &resp); err != nil {
 		return nil, err
 	}
 	id := resp.Data.TaskID
@@ -49,8 +54,11 @@ func klingPoll(ctx context.Context, p *HTTPProvider, jobID string) (*JobResult, 
 			TaskStatusMsg string `json:"task_status_msg"`
 		} `json:"data"`
 	}
-	if err := p.getJSON(ctx, "/v1/videos/text2video/"+jobID, &resp); err != nil {
-		return nil, err
+	err := p.getJSON(ctx, "/v1/videos/text2video/"+jobID, &resp)
+	if err != nil {
+		if err2 := p.getJSON(ctx, "/v1/videos/image2video/"+jobID, &resp); err2 != nil {
+			return nil, err
+		}
 	}
 	switch resp.Data.TaskStatus {
 	case "succeed", "completed", "success":

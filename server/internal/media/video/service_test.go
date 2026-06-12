@@ -29,6 +29,9 @@ func TestServiceGenerateScenesMock(t *testing.T) {
 			{ID: "s1", StartMs: 0, EndMs: 5000, Narration: "hook"},
 			{ID: "s2", StartMs: 5000, EndMs: 12000, Narration: "proof"},
 		}},
+		nil,
+		nil,
+		nil,
 	)
 	if err != nil {
 		t.Fatal(err)

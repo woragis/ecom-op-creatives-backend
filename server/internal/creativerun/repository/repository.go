@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"encoding/json"
 	"time"
 
 	"github.com/google/uuid"
@@ -67,6 +68,12 @@ func (r *Repository) UpdateRunStatus(ctx context.Context, id uuid.UUID, status s
 	return r.db.WithContext(ctx).Model(&models.CreativeRun{}).
 		Where("id = ?", id).
 		Update("status", status).Error
+}
+
+func (r *Repository) UpdateInputAssets(ctx context.Context, id uuid.UUID, assets json.RawMessage) error {
+	return r.db.WithContext(ctx).Model(&models.CreativeRun{}).
+		Where("id = ?", id).
+		Update("input_assets", assets).Error
 }
 
 func (r *Repository) GetStepByID(ctx context.Context, id uuid.UUID) (*models.PipelineStep, error) {

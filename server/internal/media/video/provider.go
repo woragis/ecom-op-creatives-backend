@@ -11,11 +11,18 @@ const (
 	StatusFailed    Status = "failed"
 )
 
+const (
+	ModeText2Video  = "text2video"
+	ModeImage2Video = "image2video"
+)
+
 type SceneRequest struct {
 	SceneID     string
 	Prompt      string
 	DurationSec int
 	AspectRatio string
+	Mode        string
+	ImageURL    string
 }
 
 type Job struct {
@@ -40,6 +47,7 @@ type Clip struct {
 	FilePath  string `json:"filePath"`
 	JobID     string `json:"jobId"`
 	Provider  string `json:"provider"`
+	Mode      string `json:"mode,omitempty"`
 }
 
 type StepOutput struct {

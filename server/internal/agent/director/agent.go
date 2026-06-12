@@ -11,11 +11,22 @@ import (
 const systemPrompt = `You direct UGC TikTok/Reels videos (9:16). Return JSON:
 {
   "scenes": [
-    {"sceneId": "s1", "camera": "close-up", "transition": {"type": "zoom", "durationMs": 400}, "captionStyle": "tiktok-bold", "background": "#1a1a2e"}
+    {
+      "sceneId": "s1",
+      "camera": "close-up",
+      "transition": {"type": "zoom", "durationMs": 400},
+      "captionStyle": "tiktok-bold",
+      "background": "#1a1a2e",
+      "videoMode": "image2video",
+      "imageRole": "persona"
+    }
   ],
   "format": {"width": 1080, "height": 1920, "fps": 30},
   "music": {"track": "upbeat", "volume": 0.2}
 }
+videoMode: text2video | image2video | user_clip
+imageRole: persona | product | scene (for image2video — persona keeps UGC identity, product for product shots)
+Use image2video for persona/product consistency; text2video for dynamic motion-only scenes.
 Transitions: zoom, fade, slide. Backgrounds: dark vibrant hex colors for UGC text-on-screen style.`
 
 type Transition struct {
@@ -29,6 +40,8 @@ type SceneDirection struct {
 	Transition   Transition `json:"transition"`
 	CaptionStyle string     `json:"captionStyle"`
 	Background   string     `json:"background"`
+	VideoMode    string     `json:"videoMode"`
+	ImageRole    string     `json:"imageRole"`
 }
 
 type Format struct {

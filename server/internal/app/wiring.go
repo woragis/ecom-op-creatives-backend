@@ -12,6 +12,7 @@ import (
 	creativerunrepo "github.com/woragis/ecom-op-creatives-backend/server/internal/creativerun/repository"
 	"github.com/woragis/ecom-op-creatives-backend/server/internal/config"
 	"github.com/woragis/ecom-op-creatives-backend/server/internal/media/elevenlabs"
+	imagemedia "github.com/woragis/ecom-op-creatives-backend/server/internal/media/image"
 	"github.com/woragis/ecom-op-creatives-backend/server/internal/media/storage"
 	"github.com/woragis/ecom-op-creatives-backend/server/internal/media/video"
 	"github.com/woragis/ecom-op-creatives-backend/server/internal/pipeline/executor"
@@ -34,6 +35,8 @@ func NewExecutor(
 	tts := elevenlabs.New(cfg.ElevenLabsKey, cfg.ElevenLabsVoice, cfg.ElevenLabsMock || cfg.ElevenLabsKey == "")
 	videoRegistry := video.NewRegistry(cfg)
 	videoSvc := video.NewService(cfg, videoRegistry, store)
+	imageRegistry := imagemedia.NewRegistry(cfg)
+	imageSvc := imagemedia.NewService(cfg, imageRegistry, store)
 
 	return executor.New(executor.Deps{
 		Cfg:        cfg,
@@ -48,6 +51,7 @@ func NewExecutor(
 		Director:   directoragent.New(llmClient),
 		Prompter:   prompteragent.New(llmClient),
 		Supervisor: supervisoragent.New(llmClient, cfg.SupervisorMin),
+		Image:      imageSvc,
 		Video:      videoSvc,
 	}), nil
 }

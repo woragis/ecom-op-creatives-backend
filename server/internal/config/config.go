@@ -32,6 +32,14 @@ type Config struct {
 	LumaAPIBase     string
 	VeoAPIKey       string
 	VeoAPIBase      string
+	ImageMock       bool
+	ImageMaxScenes  int
+	FluxAPIKey      string
+	FluxAPIBase     string
+	IdeogramAPIKey  string
+	StabilityAPIKey string
+	ImageProviderDefault string
+	VideoProviderDefault string
 }
 
 func Load() Config {
@@ -46,7 +54,7 @@ func Load() Config {
 		ElevenLabsKey:   strings.TrimSpace(os.Getenv("ELEVENLABS_API_KEY")),
 		ElevenLabsVoice: envOr("ELEVENLABS_VOICE_ID", "21m00Tcm4TlvDq8ikWAM"),
 		ElevenLabsMock:  envBool("ELEVENLABS_MOCK"),
-		StorageDir:      envOr("STORAGE_DIR", "./storage"),
+		StorageDir:      envOr("STORAGE_DIR", "../storage"),
 		RenderDir:       envOr("RENDER_DIR", "../worker-render"),
 		SupervisorMin:        envInt("SUPERVISOR_MIN_SCORE", 75),
 		VideoMock:            envBool("VIDEO_MOCK"),
@@ -61,6 +69,14 @@ func Load() Config {
 		LumaAPIBase:          envOr("LUMA_API_BASE", ""),
 		VeoAPIKey:            strings.TrimSpace(os.Getenv("GOOGLE_VEO_API_KEY")),
 		VeoAPIBase:           envOr("GOOGLE_VEO_API_BASE", ""),
+		ImageMock:            envBool("IMAGE_MOCK"),
+		ImageMaxScenes:       envInt("IMAGE_MAX_SCENES", 3),
+		FluxAPIKey:           strings.TrimSpace(os.Getenv("FLUX_API_KEY")),
+		FluxAPIBase:          envOr("FLUX_API_BASE", ""),
+		IdeogramAPIKey:       strings.TrimSpace(os.Getenv("IDEOGRAM_API_KEY")),
+		StabilityAPIKey:      strings.TrimSpace(os.Getenv("STABILITY_API_KEY")),
+		ImageProviderDefault: envOr("IMAGE_PROVIDER_DEFAULT", "flux"),
+		VideoProviderDefault: envOr("VIDEO_PROVIDER_DEFAULT", "kling"),
 	}
 }
 

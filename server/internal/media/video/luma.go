@@ -17,6 +17,14 @@ func lumaSubmit(ctx context.Context, p *HTTPProvider, req SceneRequest) (*Job, e
 		"prompt":       req.Prompt,
 		"aspect_ratio": req.AspectRatio,
 	}
+	if req.Mode == ModeImage2Video && req.ImageURL != "" {
+		body["keyframes"] = map[string]any{
+			"frame0": map[string]any{
+				"type": "image",
+				"url":  req.ImageURL,
+			},
+		}
+	}
 	var resp struct {
 		ID string `json:"id"`
 	}

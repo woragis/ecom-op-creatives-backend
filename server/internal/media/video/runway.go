@@ -17,16 +17,27 @@ func runwaySubmit(ctx context.Context, p *HTTPProvider, req SceneRequest) (*Job,
 	if req.AspectRatio == "9:16" {
 		ratio = "720:1280"
 	}
+	path := "/v1/text_to_video"
 	body := map[string]any{
 		"promptText": req.Prompt,
 		"model":      "gen4_turbo",
 		"ratio":      ratio,
 		"duration":   req.DurationSec,
 	}
+	if req.Mode == ModeImage2Video && req.ImageURL != "" {
+		path = "/v1/image_to_video"
+		body = map[string]any{
+			"promptImage": req.ImageURL,
+			"promptText":  req.Prompt,
+			"model":       "gen4_turbo",
+			"ratio":       ratio,
+			"duration":    req.DurationSec,
+		}
+	}
 	var resp struct {
 		ID string `json:"id"`
 	}
-	if err := p.postJSON(ctx, "/v1/text_to_video", body, &resp); err != nil {
+	if err := p.postJSON(ctx, path, body, &resp); err != nil {
 		return nil, err
 	}
 	if resp.ID == "" {

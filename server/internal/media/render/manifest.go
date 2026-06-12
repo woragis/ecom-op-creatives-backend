@@ -24,61 +24,78 @@ type Audio struct {
 }
 
 type Manifest struct {
-	RunID    string             `json:"runId"`
-	Format   director.Format    `json:"format"`
-	Scenes   []Scene            `json:"scenes"`
-	Captions *subtitles.Output  `json:"captions"`
-	Audio    Audio              `json:"audio"`
-	Product  string             `json:"productName"`
+	RunID     string            `json:"runId"`
+	Format    director.Format   `json:"format"`
+	Scenes    []Scene           `json:"scenes"`
+	Captions  *subtitles.Output `json:"captions"`
+	Audio     Audio             `json:"audio"`
+	Product   string            `json:"productName"`
+	IntroClip string            `json:"introClip,omitempty"`
 }
 
-func BuildManifest(
-	runID, productName, narrationURL string,
-	script *scriptwriter.Output,
-	dir *director.Output,
-	caps *subtitles.Output,
-	sceneVideos map[string]string,
-) *Manifest {
+type Input struct {
+	RunID        string
+	ProductName  string
+	NarrationURL string
+	IntroClip    string
+	Script       *scriptwriter.Output
+	Director     *director.Output
+	Captions     *subtitles.Output
+	SceneVideos  map[string]string
+}
+
+func BuildManifest(in Input) *Manifest {
+	sceneVideos := in.SceneVideos
 	if sceneVideos == nil {
 		sceneVideos = map[string]string{}
 	}
 	dirMap := map[string]director.SceneDirection{}
-	for _, s := range dir.Scenes {
-		dirMap[s.SceneID] = s
+	if in.Director != nil {
+		for _, s := range in.Director.Scenes {
+			dirMap[s.SceneID] = s
+		}
 	}
 
 	var scenes []Scene
-	for _, sc := range script.Scenes {
-		d, ok := dirMap[sc.ID]
-		bg := "#1a1a2e"
-		tr := director.Transition{Type: "fade", DurationMs: 300}
-		if ok {
-			bg = d.Background
-			tr = d.Transition
+	if in.Script != nil {
+		for _, sc := range in.Script.Scenes {
+			d, ok := dirMap[sc.ID]
+			bg := "#1a1a2e"
+			tr := director.Transition{Type: "fade", DurationMs: 300}
+			if ok {
+				bg = d.Background
+				tr = d.Transition
+			}
+			scenes = append(scenes, Scene{
+				ID:         sc.ID,
+				StartMs:    sc.StartMs,
+				DurationMs: sc.EndMs - sc.StartMs,
+				Background: bg,
+				Narration:  sc.Narration,
+				VideoURL:   sceneVideos[sc.ID],
+				Transition: tr,
+			})
 		}
-		scenes = append(scenes, Scene{
-			ID:         sc.ID,
-			StartMs:    sc.StartMs,
-			DurationMs: sc.EndMs - sc.StartMs,
-			Background: bg,
-			Narration:  sc.Narration,
-			VideoURL:   sceneVideos[sc.ID],
-			Transition: tr,
-		})
 	}
 
 	musicVol := 0.2
-	if dir.Music.Volume > 0 {
-		musicVol = dir.Music.Volume
+	if in.Director != nil && in.Director.Music.Volume > 0 {
+		musicVol = in.Director.Music.Volume
+	}
+
+	format := director.Format{Width: 1080, Height: 1920, FPS: 30}
+	if in.Director != nil && in.Director.Format.Width > 0 {
+		format = in.Director.Format
 	}
 
 	return &Manifest{
-		RunID:    runID,
-		Format:   dir.Format,
-		Scenes:   scenes,
-		Captions: caps,
-		Audio:    Audio{NarrationURL: narrationURL, MusicVolume: musicVol},
-		Product:  productName,
+		RunID:     in.RunID,
+		Format:    format,
+		Scenes:    scenes,
+		Captions:  in.Captions,
+		Audio:     Audio{NarrationURL: in.NarrationURL, MusicVolume: musicVol},
+		Product:   in.ProductName,
+		IntroClip: in.IntroClip,
 	}
 }
 

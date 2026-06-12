@@ -52,9 +52,9 @@ func (m *Mock) CompleteJSON(ctx context.Context, system, user string) ([]byte, e
 	case strings.Contains(lower, "director"):
 		return json.Marshal(map[string]any{
 			"scenes": []map[string]any{
-				{"sceneId": "s1", "camera": "close-up", "transition": map[string]any{"type": "zoom", "durationMs": 400}, "captionStyle": "tiktok-bold", "background": "#1a1a2e"},
-				{"sceneId": "s2", "camera": "medium", "transition": map[string]any{"type": "fade", "durationMs": 300}, "captionStyle": "tiktok-bold", "background": "#16213e"},
-				{"sceneId": "s3", "camera": "close-up", "transition": map[string]any{"type": "slide", "durationMs": 300}, "captionStyle": "tiktok-bold", "background": "#0f3460"},
+				{"sceneId": "s1", "camera": "close-up", "transition": map[string]any{"type": "zoom", "durationMs": 400}, "captionStyle": "tiktok-bold", "background": "#1a1a2e", "videoMode": "image2video", "imageRole": "persona"},
+				{"sceneId": "s2", "camera": "medium", "transition": map[string]any{"type": "fade", "durationMs": 300}, "captionStyle": "tiktok-bold", "background": "#16213e", "videoMode": "image2video", "imageRole": "product"},
+				{"sceneId": "s3", "camera": "close-up", "transition": map[string]any{"type": "slide", "durationMs": 300}, "captionStyle": "tiktok-bold", "background": "#0f3460", "videoMode": "text2video", "imageRole": "scene"},
 			},
 			"format": map[string]any{"width": 1080, "height": 1920, "fps": 30},
 			"music":  map[string]any{"track": "upbeat", "volume": 0.2},
@@ -62,7 +62,9 @@ func (m *Mock) CompleteJSON(ctx context.Context, system, user string) ([]byte, e
 	case strings.Contains(lower, "prompt"):
 		return json.Marshal(map[string]any{
 			"scenes": []map[string]any{
-				{"sceneId": "s1", "imagePrompt": "UGC style product unboxing surprise"},
+				{"sceneId": "s1", "imagePrompt": "UGC persona surprised holding product", "videoPrompt": "Persona reacts naturally, TikTok UGC style"},
+				{"sceneId": "s2", "imagePrompt": "Product close-up on desk, natural light", "videoPrompt": "Product demo with smooth camera motion"},
+				{"sceneId": "s3", "imagePrompt": "Happy customer testimonial selfie", "videoPrompt": "Excited CTA moment, vertical video"},
 			},
 		})
 	case strings.Contains(lower, "supervisor"):

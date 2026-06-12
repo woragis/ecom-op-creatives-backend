@@ -10,7 +10,8 @@ func Mount(mux *http.ServeMux, app *App) {
 		mux.Handle("GET /media/", http.StripPrefix("/media/", http.FileServer(http.Dir(app.StorageDir))))
 	}
 
-	mux.HandleFunc("GET /v1/video-providers", handleVideoProviders(app.VideoProviders))
+	mux.HandleFunc("GET /v1/video-providers", handleVideoProviders(app.VideoProviders, app.DefaultVideoProvider))
+	mux.HandleFunc("GET /v1/image-providers", handleImageProviders(app.ImageProviders, app.DefaultImageProvider))
 
 	if app.Products != nil {
 		ph := newProductHandler(app.Products)
@@ -25,5 +26,6 @@ func Mount(mux *http.ServeMux, app *App) {
 		mux.HandleFunc("POST /v1/creative-runs", rh.create)
 		mux.HandleFunc("GET /v1/creative-runs/{id}", rh.getByID)
 		mux.HandleFunc("POST /v1/creative-runs/{id}/start", rh.start)
+		mux.HandleFunc("POST /v1/creative-runs/{id}/assets/{type}", rh.uploadAsset)
 	}
 }

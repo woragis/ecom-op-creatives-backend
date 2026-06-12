@@ -23,7 +23,10 @@ type Manifest = {
   };
   audio?: { narrationUrl?: string; musicVolume?: number };
   productName?: string;
+  introClip?: string;
 };
+
+const INTRO_MS = 2500;
 
 const mediaSrc = (url: string) =>
   url.startsWith("http") ? url : `http://localhost:8080${url}`;
@@ -32,6 +35,8 @@ export const UGCVertical: React.FC<{ manifest: Manifest }> = ({ manifest }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
   const ms = (frame / fps) * 1000;
+
+  const showingIntro = Boolean(manifest.introClip) && ms < INTRO_MS;
 
   const scene =
     manifest.scenes?.find((s) => ms >= s.startMs && ms < s.startMs + s.durationMs) ??
@@ -44,7 +49,14 @@ export const UGCVertical: React.FC<{ manifest: Manifest }> = ({ manifest }) => {
 
   return (
     <AbsoluteFill style={{ backgroundColor: bg, fontFamily: "system-ui, sans-serif" }}>
-      {scene?.videoUrl ? (
+      {showingIntro && manifest.introClip ? (
+        <AbsoluteFill>
+          <OffthreadVideo
+            src={mediaSrc(manifest.introClip)}
+            style={{ width: "100%", height: "100%", objectFit: "cover" }}
+          />
+        </AbsoluteFill>
+      ) : scene?.videoUrl ? (
         <AbsoluteFill>
           <OffthreadVideo
             src={mediaSrc(scene.videoUrl)}

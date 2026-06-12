@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 type Local struct {
@@ -51,4 +52,40 @@ func (l *Local) ResolvePublicURL(runID, name string) string {
 
 func (l *Local) FilePath(runID, name string) string {
 	return filepath.Join(l.RunDir(runID), name)
+}
+
+func (l *Local) InputDir(runID string) string {
+	return filepath.Join(l.RunDir(runID), "input")
+}
+
+func (l *Local) WriteInputFile(runID, assetType, ext string, data []byte) (string, string, error) {
+	dir := l.InputDir(runID)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return "", "", err
+	}
+	if ext == "" {
+		ext = ".bin"
+	}
+	if ext[0] != '.' {
+		ext = "." + ext
+	}
+	name := assetType + ext
+	path := filepath.Join(dir, name)
+	if err := os.WriteFile(path, data, 0o644); err != nil {
+		return "", "", err
+	}
+	public := fmt.Sprintf("/media/runs/%s/input/%s", runID, name)
+	return path, public, nil
+}
+
+func PublicToRelPath(publicURL string) string {
+	const prefix = "/media/runs/"
+	if !strings.HasPrefix(publicURL, prefix) {
+		return publicURL
+	}
+	rest := publicURL[len(prefix):]
+	if i := strings.Index(rest, "/"); i >= 0 {
+		return rest[i+1:]
+	}
+	return rest
 }

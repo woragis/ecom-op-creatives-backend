@@ -6,19 +6,19 @@ import (
 	"github.com/woragis/ecom-op-creatives-backend/server/internal/pipeline"
 )
 
-func handleVideoProviders(configured []string, defaultProvider string) http.HandlerFunc {
+func handleImageProviders(configured []string, defaultProvider string) http.HandlerFunc {
 	return func(w http.ResponseWriter, _ *http.Request) {
-		all := []string{"kling", "runway", "luma", "veo"}
+		all := []string{"flux", "dalle", "ideogram", "stability"}
 		configuredSet := map[string]bool{}
 		for _, id := range configured {
 			configuredSet[id] = true
 		}
 		if defaultProvider == "" {
-			defaultProvider = pipeline.DefaultVideoProvider()
+			defaultProvider = pipeline.DefaultImageProvider()
 		}
 		items := make([]map[string]any, 0, len(all))
 		for _, id := range all {
-			if !pipeline.ValidVideoProvider(id) {
+			if !pipeline.ValidImageProvider(id) {
 				continue
 			}
 			items = append(items, map[string]any{

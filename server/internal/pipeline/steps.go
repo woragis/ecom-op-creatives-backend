@@ -1,5 +1,7 @@
 package pipeline
 
+import "os"
+
 var StepDefinitions = []struct {
 	Type  string
 	Order int
@@ -61,4 +63,25 @@ func ValidVideoProvider(provider string) bool {
 	}
 }
 
-func DefaultVideoProvider() string { return "kling" }
+func DefaultVideoProvider() string {
+	if v := os.Getenv("VIDEO_PROVIDER_DEFAULT"); v != "" {
+		return v
+	}
+	return "kling"
+}
+
+func ValidImageProvider(provider string) bool {
+	switch provider {
+	case "flux", "dalle", "ideogram", "stability":
+		return true
+	default:
+		return false
+	}
+}
+
+func DefaultImageProvider() string {
+	if v := os.Getenv("IMAGE_PROVIDER_DEFAULT"); v != "" {
+		return v
+	}
+	return "flux"
+}

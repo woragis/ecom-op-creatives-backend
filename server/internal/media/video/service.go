@@ -3,12 +3,17 @@ package video
 import (
 	"context"
 	"fmt"
+	"os"
+	"strings"
 	"time"
 
+	directoragent "github.com/woragis/ecom-op-creatives-backend/server/internal/agent/director"
 	prompteragent "github.com/woragis/ecom-op-creatives-backend/server/internal/agent/prompter"
 	"github.com/woragis/ecom-op-creatives-backend/server/internal/agent/scriptwriter"
 	"github.com/woragis/ecom-op-creatives-backend/server/internal/config"
+	imagemedia "github.com/woragis/ecom-op-creatives-backend/server/internal/media/image"
 	"github.com/woragis/ecom-op-creatives-backend/server/internal/media/storage"
+	"github.com/woragis/ecom-op-creatives-backend/server/internal/models"
 )
 
 type Service struct {
@@ -18,9 +23,14 @@ type Service struct {
 	pollInterval time.Duration
 	maxPoll      time.Duration
 	mockBytes    []byte
+	apiPublicURL string
 }
 
 func NewService(cfg config.Config, registry *Registry, store *storage.Local) *Service {
+	publicURL := strings.TrimSpace(os.Getenv("API_PUBLIC_URL"))
+	if publicURL == "" {
+		publicURL = "http://localhost:8080"
+	}
 	return &Service{
 		registry:     registry,
 		store:        store,
@@ -28,6 +38,7 @@ func NewService(cfg config.Config, registry *Registry, store *storage.Local) *Se
 		pollInterval: time.Duration(cfg.VideoPollIntervalSec) * time.Second,
 		maxPoll:      time.Duration(cfg.VideoMaxPollMin) * time.Minute,
 		mockBytes:    []byte("MOCK_SCENE_MP4"),
+		apiPublicURL: strings.TrimRight(publicURL, "/"),
 	}
 }
 
@@ -36,6 +47,9 @@ func (s *Service) GenerateScenes(
 	providerID, runID string,
 	prompter *prompteragent.Output,
 	script *scriptwriter.Output,
+	director *directoragent.Output,
+	imageOut *imagemedia.StepOutput,
+	assets *models.RunAssets,
 ) (*StepOutput, error) {
 	provider, err := s.registry.Get(providerID)
 	if err != nil {
@@ -46,6 +60,7 @@ func (s *Service) GenerateScenes(
 	for _, p := range prompter.Scenes {
 		prompts[p.SceneID] = p.VideoPrompt
 	}
+	dirMap := directoragent.SceneMap(director)
 
 	var clips []Clip
 	limit := s.maxScenes
@@ -57,23 +72,72 @@ func (s *Service) GenerateScenes(
 		if i >= limit {
 			break
 		}
+		dir, _ := dirMap[sc.ID]
+		mode := dir.VideoMode
+		if mode == "" {
+			mode = ModeText2Video
+		}
+
 		prompt := prompts[sc.ID]
 		if prompt == "" {
 			prompt = sc.Narration
 		}
+
+		imageURL := ""
+		if mode == ModeImage2Video {
+			role := dir.ImageRole
+			if role == "" {
+				role = imagemedia.RoleScene
+			}
+			imageURL = imagemedia.ImageForScene(imageOut, sc.ID, role)
+			if imageURL == "" {
+				imageURL = assetImageForRole(assets, role)
+			}
+			if imageURL == "" {
+				mode = ModeText2Video
+			}
+		}
+
 		clip, err := s.generateClip(ctx, provider, providerID, runID, SceneRequest{
 			SceneID:     sc.ID,
 			Prompt:      prompt,
 			DurationSec: clampDuration((sc.EndMs - sc.StartMs) / 1000),
 			AspectRatio: "9:16",
+			Mode:        mode,
+			ImageURL:    s.resolveMediaURL(imageURL),
 		})
 		if err != nil {
 			return nil, fmt.Errorf("scene %s: %w", sc.ID, err)
 		}
+		clip.Mode = mode
 		clips = append(clips, *clip)
 	}
 
 	return &StepOutput{Provider: providerID, Clips: clips}, nil
+}
+
+func assetImageForRole(assets *models.RunAssets, role string) string {
+	if assets == nil {
+		return ""
+	}
+	switch role {
+	case imagemedia.RolePersona:
+		return assets.PersonaImage
+	case imagemedia.RoleProduct:
+		return assets.ProductImage
+	default:
+		return ""
+	}
+}
+
+func (s *Service) resolveMediaURL(publicPath string) string {
+	if publicPath == "" {
+		return ""
+	}
+	if strings.HasPrefix(publicPath, "http://") || strings.HasPrefix(publicPath, "https://") {
+		return publicPath
+	}
+	return s.apiPublicURL + publicPath
 }
 
 func (s *Service) generateClip(ctx context.Context, provider Provider, providerID, runID string, req SceneRequest) (*Clip, error) {

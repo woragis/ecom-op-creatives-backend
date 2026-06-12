@@ -8,7 +8,7 @@ import (
 
 func TestHandleVideoProviders(t *testing.T) {
 	mux := http.NewServeMux()
-	mux.HandleFunc("GET /v1/video-providers", handleVideoProviders([]string{"kling", "runway"}))
+	mux.HandleFunc("GET /v1/video-providers", handleVideoProviders([]string{"kling", "runway"}, "kling"))
 	req := httptest.NewRequest(http.MethodGet, "/v1/video-providers", nil)
 	rec := httptest.NewRecorder()
 	mux.ServeHTTP(rec, req)

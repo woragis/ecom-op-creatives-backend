@@ -1,6 +1,7 @@
 package models
 
 import (
+	"encoding/json"
 	"time"
 
 	"github.com/google/uuid"
@@ -25,14 +26,16 @@ type Campaign struct {
 }
 
 type CreativeRun struct {
-	ID            uuid.UUID  `gorm:"type:uuid;primaryKey" json:"id"`
-	ProductID     uuid.UUID  `gorm:"type:uuid;not null" json:"productId"`
-	CampaignID    *uuid.UUID `gorm:"type:uuid" json:"campaignId,omitempty"`
-	VideoProvider string     `json:"videoProvider"`
-	Status        string     `json:"status"`
-	Hook          *string    `json:"hook,omitempty"`
-	CreatedAt     time.Time  `json:"createdAt"`
-	UpdatedAt     time.Time  `json:"updatedAt"`
+	ID            uuid.UUID       `gorm:"type:uuid;primaryKey" json:"id"`
+	ProductID     uuid.UUID       `gorm:"type:uuid;not null" json:"productId"`
+	CampaignID    *uuid.UUID      `gorm:"type:uuid" json:"campaignId,omitempty"`
+	VideoProvider string          `json:"videoProvider"`
+	ImageProvider string          `json:"imageProvider"`
+	InputAssets   json.RawMessage `gorm:"type:jsonb" json:"inputAssets,omitempty"`
+	Status        string          `json:"status"`
+	Hook          *string         `json:"hook,omitempty"`
+	CreatedAt     time.Time       `json:"createdAt"`
+	UpdatedAt     time.Time       `json:"updatedAt"`
 
 	Steps []PipelineStep `gorm:"foreignKey:CreativeRunID" json:"steps,omitempty"`
 }

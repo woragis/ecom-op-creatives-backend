@@ -65,7 +65,16 @@ DATABASE_URL=postgres://creatives:creatives@localhost:5432/creatives?sslmode=dis
   go test -tags=integration ./internal/product/repository/...
 ```
 
-## Phase 2 (em progresso) — AI video
+## Phase 3 — Image + image2video + assets
+
+- Image providers: Flux, DALL·E, Ideogram, Stability (+ `IMAGE_MOCK=1`)
+- `imageProvider` por run + `GET /v1/image-providers`
+- Step `image` gera PNG por cena (persona/product/scene)
+- Step `video` suporta `image2video` via director `videoMode` + `imageRole`
+- Upload de assets: `POST /v1/creative-runs/{id}/assets/{persona|product|intro}`
+- Storage local em `../storage` (volume host, persiste em dev)
+
+## Phase 2 — AI video
 
 - Providers plugáveis: Kling, Runway, Luma, Veo (+ mock)
 - Step `video` gera clips por cena (até `VIDEO_MAX_SCENES`)
