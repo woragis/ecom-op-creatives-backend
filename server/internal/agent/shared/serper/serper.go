@@ -8,6 +8,8 @@ import (
 	"io"
 	"net/http"
 	"time"
+
+	"github.com/woragis/ecom-op-creatives-backend/server/internal/platform/applog"
 )
 
 const serperURL = "https://google.serper.dev/search"
@@ -40,6 +42,10 @@ type serperResponse struct {
 }
 
 func (c *HTTPClient) Search(ctx context.Context, query string) (*SearchResponse, error) {
+	started := time.Now()
+	log := applog.FromContext(ctx).With("service", "serper", "operation", "search")
+	log.Info("serper search", "query", query)
+
 	body, err := json.Marshal(serperRequest{Q: query, GL: c.gl, HL: c.hl, Num: 5})
 	if err != nil {
 		return nil, err
@@ -62,6 +68,11 @@ func (c *HTTPClient) Search(ctx context.Context, query string) (*SearchResponse,
 		return nil, err
 	}
 	if res.StatusCode >= 400 {
+		log.Error("serper search failed",
+			"status", res.StatusCode,
+			"duration_ms", time.Since(started).Milliseconds(),
+			"body_preview", applog.Truncate(string(raw), 300),
+		)
 		return nil, fmt.Errorf("serper http %d: %s", res.StatusCode, string(raw))
 	}
 
@@ -69,5 +80,9 @@ func (c *HTTPClient) Search(ctx context.Context, query string) (*SearchResponse,
 	if err := json.Unmarshal(raw, &parsed); err != nil {
 		return nil, err
 	}
+	log.Info("serper search completed",
+		"duration_ms", time.Since(started).Milliseconds(),
+		"results", len(parsed.Organic),
+	)
 	return &SearchResponse{Query: query, Organic: parsed.Organic}, nil
 }
