@@ -45,8 +45,17 @@ handler → service → repository
 cp .env.example .env
 docker compose up -d
 make migrate
-make dev          # API on :8080
-make worker-stub  # pipeline stub worker (separate terminal)
+make dev              # API :8080
+make worker-pipeline  # real pipeline (use LLM_MOCK=1 for local dev)
+```
+
+With mocks (no API keys):
+
+```env
+LLM_MOCK=1
+SERPER_MOCK=1
+ELEVENLABS_MOCK=1
+RENDER_MOCK=1
 ```
 
 Integration tests:
@@ -56,13 +65,15 @@ DATABASE_URL=postgres://creatives:creatives@localhost:5432/creatives?sslmode=dis
   go test -tags=integration ./internal/product/repository/...
 ```
 
-## Phase 0 entregue
+## Phase 1 entregue
 
-- Go API: `GET /health`, `GET /ready`
-- CRUD products + creative runs
-- Pipeline com 12 steps + RabbitMQ enqueue
-- Worker stub (`cmd/worker-stub`) marca steps como done
-- Migrations SQL + AutoMigrate
+- Research agent: LLM queries → Serper → LLM synthesis
+- Agents: hooks, script, director, prompter, supervisor
+- ElevenLabs voice step
+- Subtitles from script timing
+- Remotion render manifest + worker-render
+- `worker-pipeline` replaces stub for real execution
+- Media served at `GET /media/runs/{id}/...`
 
 ## Documentação
 

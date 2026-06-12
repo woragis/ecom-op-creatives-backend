@@ -1,0 +1,16 @@
+{
+  "name": "ecom-op-creatives-worker-render",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "render": "node scripts/render.mjs"
+  },
+  "dependencies": {
+    "@remotion/bundler": "^4.0.286",
+    "@remotion/renderer": "^4.0.286",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "remotion": "^4.0.286"
+  }
+}

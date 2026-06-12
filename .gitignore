@@ -24,6 +24,7 @@ coverage.out
 
 # Temp
 /tmp/
+/storage/
 *.mp4
 *.mp3
 *.png
