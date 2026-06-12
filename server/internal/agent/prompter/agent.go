@@ -24,9 +24,10 @@ type Output struct {
 }
 
 type Input struct {
-	Script   *scriptwriter.Output `json:"script"`
-	Director *director.Output     `json:"director"`
-	Product  string               `json:"productName"`
+	Script      *scriptwriter.Output `json:"script"`
+	Director    *director.Output     `json:"director"`
+	Product     string               `json:"productName"`
+	Description *string              `json:"description,omitempty"`
 }
 
 type Agent struct{ llm llm.Client }

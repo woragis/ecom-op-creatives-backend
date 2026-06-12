@@ -8,12 +8,13 @@ import (
 )
 
 type Product struct {
-	ID        uuid.UUID `gorm:"type:uuid;primaryKey" json:"id"`
-	Name      string    `json:"name"`
-	URL       *string   `json:"url,omitempty"`
-	Niche     *string   `json:"niche,omitempty"`
-	CreatedAt time.Time `json:"createdAt"`
-	UpdatedAt time.Time `json:"updatedAt"`
+	ID          uuid.UUID `gorm:"type:uuid;primaryKey" json:"id"`
+	Name        string    `json:"name"`
+	Description *string   `json:"description,omitempty"`
+	URL         *string   `json:"url,omitempty"`
+	Niche       *string   `json:"niche,omitempty"`
+	CreatedAt   time.Time `json:"createdAt"`
+	UpdatedAt   time.Time `json:"updatedAt"`
 }
 
 type Campaign struct {

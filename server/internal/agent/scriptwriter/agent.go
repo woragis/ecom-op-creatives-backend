@@ -22,6 +22,7 @@ Rules: short punchy sentences, conversational Portuguese (BR), strong hook in s1
 
 type Input struct {
 	ProductName string           `json:"productName"`
+	Description *string          `json:"description,omitempty"`
 	Research    *research.Output `json:"research"`
 	Hook        *hooks.Output    `json:"hook"`
 }

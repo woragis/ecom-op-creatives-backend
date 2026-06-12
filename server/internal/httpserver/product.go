@@ -16,9 +16,10 @@ func newProductHandler(svc *productsvc.Service) *productHandler {
 }
 
 type createProductRequest struct {
-	Name  string  `json:"name"`
-	URL   *string `json:"url"`
-	Niche *string `json:"niche"`
+	Name        string  `json:"name"`
+	Description *string `json:"description"`
+	URL         *string `json:"url"`
+	Niche       *string `json:"niche"`
 }
 
 func (h *productHandler) list(w http.ResponseWriter, r *http.Request) {
@@ -37,9 +38,10 @@ func (h *productHandler) create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	item, err := h.svc.Create(r.Context(), productsvc.CreateInput{
-		Name:  req.Name,
-		URL:   req.URL,
-		Niche: req.Niche,
+		Name:        req.Name,
+		Description: req.Description,
+		URL:         req.URL,
+		Niche:       req.Niche,
 	})
 	if err != nil {
 		writeServiceError(w, err)

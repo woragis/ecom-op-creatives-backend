@@ -31,6 +31,7 @@ Use real language from snippets. Be specific to the product niche.`
 
 type Input struct {
 	ProductName string  `json:"productName"`
+	Description *string `json:"description,omitempty"`
 	ProductURL  *string `json:"productUrl,omitempty"`
 	Niche       *string `json:"niche,omitempty"`
 }
@@ -83,8 +84,8 @@ func (a *Agent) Execute(ctx context.Context, in Input) (*Output, error) {
 }
 
 func (a *Agent) generateQueries(ctx context.Context, in Input) ([]string, error) {
-	user := fmt.Sprintf("Product: %s\nNiche: %s\nURL: %s",
-		in.ProductName, strOr(in.Niche, "general"), strOr(in.ProductURL, ""))
+	user := fmt.Sprintf("Product: %s\nDescription: %s\nNiche: %s\nURL: %s",
+		in.ProductName, strOr(in.Description, ""), strOr(in.Niche, "general"), strOr(in.ProductURL, ""))
 	raw, err := a.llm.CompleteJSON(ctx, querySystemPrompt, user)
 	if err != nil {
 		return nil, fmt.Errorf("generate queries: %w", err)
@@ -126,7 +127,8 @@ func (a *Agent) searchAll(ctx context.Context, queries []string) ([]Source, erro
 
 func (a *Agent) synthesize(ctx context.Context, in Input, sources []Source) (*Output, error) {
 	var sb strings.Builder
-	sb.WriteString(fmt.Sprintf("Product: %s\nNiche: %s\n\nSearch results:\n", in.ProductName, strOr(in.Niche, "")))
+	sb.WriteString(fmt.Sprintf("Product: %s\nDescription: %s\nNiche: %s\n\nSearch results:\n",
+		in.ProductName, strOr(in.Description, ""), strOr(in.Niche, "")))
 	for i, s := range sources {
 		if i >= 25 {
 			break

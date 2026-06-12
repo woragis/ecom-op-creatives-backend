@@ -20,6 +20,7 @@ Hooks in Portuguese for BR audience unless product is clearly international.`
 
 type Input struct {
 	ProductName string           `json:"productName"`
+	Description *string          `json:"description,omitempty"`
 	Research    *research.Output `json:"research"`
 	UserHook    *string          `json:"userHook,omitempty"`
 }
@@ -46,7 +47,11 @@ func (a *Agent) Execute(ctx context.Context, in Input) (*Output, error) {
 		}, nil
 	}
 	researchJSON, _ := json.Marshal(in.Research)
-	user := fmt.Sprintf("Product: %s\nResearch:\n%s", in.ProductName, string(researchJSON))
+	desc := ""
+	if in.Description != nil {
+		desc = *in.Description
+	}
+	user := fmt.Sprintf("Product: %s\nDescription: %s\nResearch:\n%s", in.ProductName, desc, string(researchJSON))
 	raw, err := a.llm.CompleteJSON(ctx, systemPrompt, user)
 	if err != nil {
 		return nil, err

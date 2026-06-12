@@ -19,9 +19,10 @@ func New(repo *productrepo.Repository) *Service {
 }
 
 type CreateInput struct {
-	Name  string
-	URL   *string
-	Niche *string
+	Name        string
+	Description *string
+	URL         *string
+	Niche       *string
 }
 
 func (s *Service) Create(ctx context.Context, in CreateInput) (*models.Product, error) {
@@ -30,9 +31,10 @@ func (s *Service) Create(ctx context.Context, in CreateInput) (*models.Product, 
 		return nil, apperrors.Invalid(apperrors.CodeProductCreateInvalidBody, apperrors.MsgProductCreateInvalidBody)
 	}
 	product := &models.Product{
-		Name:  name,
-		URL:   in.URL,
-		Niche: in.Niche,
+		Name:        name,
+		Description: in.Description,
+		URL:         in.URL,
+		Niche:       in.Niche,
 	}
 	if err := s.repo.Create(ctx, product); err != nil {
 		return nil, apperrors.Wrapf(err, "product create")
