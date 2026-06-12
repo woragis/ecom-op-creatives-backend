@@ -27,4 +27,10 @@ const (
 
 	CodeCreativeRunStartInvalidState = "CREATIVE_RUN_START_V1_SERVICE_INVALID_STATE"
 	MsgCreativeRunStartInvalidState  = "Creative run cannot be started in its current state"
+
+	CodeCreativeRunStepEditInvalid = "CREATIVE_RUN_STEP_PATCH_V1_SERVICE_INVALID"
+	MsgCreativeRunStepEditInvalid  = "Step cannot be edited in its current state"
+
+	CodeCreativeRunReprocessInvalid = "CREATIVE_RUN_REPROCESS_V1_SERVICE_INVALID"
+	MsgCreativeRunReprocessInvalid  = "Run cannot be reprocessed in its current state"
 )

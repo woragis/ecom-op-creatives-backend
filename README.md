@@ -65,6 +65,13 @@ DATABASE_URL=postgres://creatives:creatives@localhost:5432/creatives?sslmode=dis
   go test -tags=integration ./internal/product/repository/...
 ```
 
+## Phase 4 — Reprocessamento
+
+- `PATCH /v1/creative-runs/{id}/steps/{stepId}` — edit `outputJson`, optional reprocess
+- `POST /v1/creative-runs/{id}/reprocess` — `{ "fromStepType": "render" }`
+- Downstream steps reset to `pending` and re-enqueued
+- Asset upload on finished runs triggers reprocess (intro → render, persona/product → image)
+
 ## Phase 3 — Image + image2video + assets
 
 - Image providers: Flux, DALL·E, Ideogram, Stability (+ `IMAGE_MOCK=1`)

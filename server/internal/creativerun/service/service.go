@@ -117,7 +117,7 @@ func (s *Service) UploadAsset(ctx context.Context, runID uuid.UUID, assetType st
 	if err != nil {
 		return nil, err
 	}
-	if run.Status != models.RunStatusDraft && run.Status != models.RunStatusFailed {
+	if !canUploadAssets(run.Status) {
 		return nil, apperrors.ConflictErr(apperrors.CodeCreativeRunStartInvalidState, apperrors.MsgCreativeRunStartInvalidState)
 	}
 	_, publicURL, err := s.storage.WriteInputFile(runID.String(), assetType, ext, data)
@@ -135,6 +135,11 @@ func (s *Service) UploadAsset(ctx context.Context, runID uuid.UUID, assetType st
 	}
 	if err := s.repo.UpdateInputAssets(ctx, runID, assets.JSON()); err != nil {
 		return nil, apperrors.Wrapf(err, "update input assets")
+	}
+	if run.Status != models.RunStatusDraft {
+		if err := s.reprocessAfterAssetUpload(ctx, runID, assetType); err != nil {
+			return nil, err
+		}
 	}
 	return assets, nil
 }

@@ -1,6 +1,7 @@
 package httpserver
 
 import (
+	"encoding/json"
 	"io"
 	"net/http"
 	"path/filepath"
@@ -126,4 +127,65 @@ func (h *creativeRunHandler) uploadAsset(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	writeJSON(w, http.StatusOK, assets)
+}
+
+type patchStepRequest struct {
+	OutputJSON json.RawMessage `json:"outputJson"`
+	Reprocess  *bool           `json:"reprocess"`
+}
+
+func (h *creativeRunHandler) patchStep(w http.ResponseWriter, r *http.Request) {
+	runID, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		writeServiceError(w, err)
+		return
+	}
+	stepID, err := uuid.Parse(r.PathValue("stepId"))
+	if err != nil {
+		writeServiceError(w, err)
+		return
+	}
+	var req patchStepRequest
+	if err := decodeJSON(r, &req); err != nil {
+		writeServiceError(w, err)
+		return
+	}
+	reprocess := true
+	if req.Reprocess != nil {
+		reprocess = *req.Reprocess
+	}
+	run, err := h.svc.EditStep(r.Context(), creativerunsvc.EditStepInput{
+		RunID:      runID,
+		StepID:     stepID,
+		OutputJSON: req.OutputJSON,
+		Reprocess:  reprocess,
+	})
+	if err != nil {
+		writeServiceError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, run)
+}
+
+type reprocessRequest struct {
+	FromStepType string `json:"fromStepType"`
+}
+
+func (h *creativeRunHandler) reprocess(w http.ResponseWriter, r *http.Request) {
+	runID, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		writeServiceError(w, err)
+		return
+	}
+	var req reprocessRequest
+	if err := decodeJSON(r, &req); err != nil {
+		writeServiceError(w, err)
+		return
+	}
+	run, err := h.svc.Reprocess(r.Context(), runID, req.FromStepType)
+	if err != nil {
+		writeServiceError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, run)
 }

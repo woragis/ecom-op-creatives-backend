@@ -27,5 +27,7 @@ func Mount(mux *http.ServeMux, app *App) {
 		mux.HandleFunc("GET /v1/creative-runs/{id}", rh.getByID)
 		mux.HandleFunc("POST /v1/creative-runs/{id}/start", rh.start)
 		mux.HandleFunc("POST /v1/creative-runs/{id}/assets/{type}", rh.uploadAsset)
+		mux.HandleFunc("PATCH /v1/creative-runs/{id}/steps/{stepId}", rh.patchStep)
+		mux.HandleFunc("POST /v1/creative-runs/{id}/reprocess", rh.reprocess)
 	}
 }

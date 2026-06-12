@@ -145,3 +145,66 @@ func (r *Repository) FirstStep(ctx context.Context, runID uuid.UUID) (*models.Pi
 	}
 	return &step, nil
 }
+
+func (r *Repository) GetStepInRun(ctx context.Context, runID, stepID uuid.UUID) (*models.PipelineStep, error) {
+	var step models.PipelineStep
+	err := r.db.WithContext(ctx).
+		Where("id = ? AND creative_run_id = ?", stepID, runID).
+		First(&step).Error
+	if err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return nil, apperrors.NotFound(apperrors.CodeCreativeRunGetNotFound, apperrors.MsgCreativeRunGetNotFound)
+		}
+		return nil, apperrors.Wrapf(err, "pipeline step in run")
+	}
+	return &step, nil
+}
+
+func (r *Repository) StepByRunAndOrder(ctx context.Context, runID uuid.UUID, order int) (*models.PipelineStep, error) {
+	var step models.PipelineStep
+	err := r.db.WithContext(ctx).
+		Where("creative_run_id = ? AND step_order = ?", runID, order).
+		First(&step).Error
+	if err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return nil, apperrors.NotFound(apperrors.CodeCreativeRunGetNotFound, apperrors.MsgCreativeRunGetNotFound)
+		}
+		return nil, apperrors.Wrapf(err, "pipeline step by order")
+	}
+	return &step, nil
+}
+
+func (r *Repository) UpdateStepOutput(ctx context.Context, stepID uuid.UUID, output json.RawMessage) error {
+	return r.db.WithContext(ctx).Model(&models.PipelineStep{}).
+		Where("id = ?", stepID).
+		Updates(map[string]any{
+			"status":       models.StepStatusDone,
+			"output_json":  output,
+			"error_message": nil,
+			"completed_at": gorm.Expr("now()"),
+		}).Error
+}
+
+func resetStepFields() map[string]any {
+	return map[string]any{
+		"status":        models.StepStatusPending,
+		"output_json":   json.RawMessage(`{}`),
+		"error_message": nil,
+		"started_at":    nil,
+		"completed_at":  nil,
+	}
+}
+
+// ResetStepsAfterOrder marks steps with step_order > afterOrder as pending.
+func (r *Repository) ResetStepsAfterOrder(ctx context.Context, runID uuid.UUID, afterOrder int) error {
+	return r.db.WithContext(ctx).Model(&models.PipelineStep{}).
+		Where("creative_run_id = ? AND step_order > ?", runID, afterOrder).
+		Updates(resetStepFields()).Error
+}
+
+// ResetStepsFromOrder marks steps with step_order >= fromOrder as pending.
+func (r *Repository) ResetStepsFromOrder(ctx context.Context, runID uuid.UUID, fromOrder int) error {
+	return r.db.WithContext(ctx).Model(&models.PipelineStep{}).
+		Where("creative_run_id = ? AND step_order >= ?", runID, fromOrder).
+		Updates(resetStepFields()).Error
+}
