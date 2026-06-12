@@ -20,6 +20,15 @@ var StepDefinitions = []struct {
 	{Type: "supervisor", Order: 12},
 }
 
+func StepOrder(stepType string) int {
+	for _, def := range StepDefinitions {
+		if def.Type == stepType {
+			return def.Order
+		}
+	}
+	return 0
+}
+
 func QueueForStep(stepType string) string {
 	switch stepType {
 	case "research":

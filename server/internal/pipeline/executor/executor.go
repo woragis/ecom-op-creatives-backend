@@ -28,7 +28,9 @@ import (
 	"github.com/woragis/ecom-op-creatives-backend/server/internal/media/video"
 	"github.com/woragis/ecom-op-creatives-backend/server/internal/models"
 	pipelinesvc "github.com/woragis/ecom-op-creatives-backend/server/internal/pipeline/service"
+	"github.com/woragis/ecom-op-creatives-backend/server/internal/platform/applog"
 	productrepo "github.com/woragis/ecom-op-creatives-backend/server/internal/product/repository"
+	"time"
 )
 
 type Executor struct {
@@ -92,6 +94,7 @@ func (e *Executor) ProcessStep(ctx context.Context, stepID uuid.UUID) error {
 	if err != nil {
 		return err
 	}
+	log := applog.ForStep(step.CreativeRunID, step.StepType)
 	if step.Status == models.StepStatusDone {
 		return e.advance(ctx, step)
 	}
@@ -100,6 +103,9 @@ func (e *Executor) ProcessStep(ctx context.Context, stepID uuid.UUID) error {
 		return err
 	}
 
+	started := time.Now()
+	log.Info("step started")
+
 	rc, err := e.loadContext(ctx, step.CreativeRunID)
 	if err != nil {
 		return err
@@ -107,13 +113,22 @@ func (e *Executor) ProcessStep(ctx context.Context, stepID uuid.UUID) error {
 
 	output, err := e.executeStep(ctx, step.StepType, rc)
 	if err != nil {
+		_ = e.storage.WriteStepErrorArtifact(step.CreativeRunID.String(), step.StepType, err.Error())
 		_ = e.repo.FailStep(ctx, stepID, err.Error())
+		log.Error("step failed", "error", err.Error(), "duration_ms", time.Since(started).Milliseconds())
 		return err
 	}
 
-	if err := e.repo.CompleteStep(ctx, stepID, output); err != nil {
+	provider := extractProvider(output)
+	if err := e.repo.CompleteStep(ctx, stepID, output, provider); err != nil {
 		return err
 	}
+	_ = e.storage.WriteStepArtifact(step.CreativeRunID.String(), step.StepType, output)
+	attrs := []any{"duration_ms", time.Since(started).Milliseconds()}
+	if provider != nil {
+		attrs = append(attrs, "provider", *provider)
+	}
+	log.Info("step completed", attrs...)
 	return e.advance(ctx, step)
 }
 
@@ -128,11 +143,28 @@ func (e *Executor) advance(ctx context.Context, step *models.PipelineStep) error
 			return err
 		}
 		if run.Status == models.RunStatusRunning {
+			applog.ForRun(step.CreativeRunID).Info("pipeline finished — awaiting review")
 			return e.repo.UpdateRunStatus(ctx, step.CreativeRunID, models.RunStatusNeedsReview)
 		}
 		return nil
 	}
+	if e.cfg.PauseBeforeVideo && step.StepType == "image" && next.StepType == "video" {
+		applog.ForRun(step.CreativeRunID).Info("paused before video — awaiting continue")
+		return e.repo.UpdateRunStatus(ctx, step.CreativeRunID, models.RunStatusNeedsReview)
+	}
 	return e.pipeline.EnqueueStep(ctx, next)
+}
+
+func extractProvider(output []byte) *string {
+	var m map[string]any
+	if err := json.Unmarshal(output, &m); err != nil {
+		return nil
+	}
+	p, ok := m["provider"].(string)
+	if !ok || p == "" {
+		return nil
+	}
+	return &p
 }
 
 func (e *Executor) loadContext(ctx context.Context, runID uuid.UUID) (*runContext, error) {

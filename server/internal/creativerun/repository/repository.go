@@ -99,14 +99,19 @@ func (r *Repository) MarkStepRunning(ctx context.Context, stepID uuid.UUID) erro
 		}).Error
 }
 
-func (r *Repository) CompleteStep(ctx context.Context, stepID uuid.UUID, output []byte) error {
+func (r *Repository) CompleteStep(ctx context.Context, stepID uuid.UUID, output []byte, provider *string) error {
+	updates := map[string]any{
+		"status":        models.StepStatusDone,
+		"output_json":   output,
+		"error_message": nil,
+		"completed_at":  gorm.Expr("now()"),
+	}
+	if provider != nil && *provider != "" {
+		updates["provider_used"] = *provider
+	}
 	return r.db.WithContext(ctx).Model(&models.PipelineStep{}).
 		Where("id = ?", stepID).
-		Updates(map[string]any{
-			"status":       models.StepStatusDone,
-			"output_json":  output,
-			"completed_at": gorm.Expr("now()"),
-		}).Error
+		Updates(updates).Error
 }
 
 func (r *Repository) FailStep(ctx context.Context, stepID uuid.UUID, message string) error {
@@ -132,6 +137,29 @@ func (r *Repository) NextPendingStep(ctx context.Context, runID uuid.UUID, after
 		return nil, apperrors.Wrapf(err, "next pending step")
 	}
 	return &step, nil
+}
+
+func (r *Repository) FirstPendingStep(ctx context.Context, runID uuid.UUID) (*models.PipelineStep, error) {
+	var step models.PipelineStep
+	err := r.db.WithContext(ctx).
+		Where("creative_run_id = ? AND status = ?", runID, models.StepStatusPending).
+		Order("step_order ASC").
+		First(&step).Error
+	if err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return nil, nil
+		}
+		return nil, apperrors.Wrapf(err, "first pending step")
+	}
+	return &step, nil
+}
+
+func (r *Repository) HasPendingSteps(ctx context.Context, runID uuid.UUID) (bool, error) {
+	var n int64
+	err := r.db.WithContext(ctx).Model(&models.PipelineStep{}).
+		Where("creative_run_id = ? AND status = ?", runID, models.StepStatusPending).
+		Count(&n).Error
+	return n > 0, err
 }
 
 func (r *Repository) FirstStep(ctx context.Context, runID uuid.UUID) (*models.PipelineStep, error) {

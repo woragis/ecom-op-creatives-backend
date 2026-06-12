@@ -177,7 +177,7 @@ func (s *Service) CompleteStepStub(ctx context.Context, stepID uuid.UUID) error 
 		"stub":     true,
 		"stepType": step.StepType,
 	})
-	if err := s.repo.CompleteStep(ctx, stepID, output); err != nil {
+	if err := s.repo.CompleteStep(ctx, stepID, output, nil); err != nil {
 		return apperrors.Wrapf(err, "complete step")
 	}
 
