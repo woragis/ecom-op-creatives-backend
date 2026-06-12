@@ -20,6 +20,18 @@ type Config struct {
 	StorageDir      string
 	RenderDir       string
 	SupervisorMin   int
+	VideoMock       bool
+	VideoMaxScenes  int
+	VideoPollIntervalSec int
+	VideoMaxPollMin int
+	KlingAPIKey     string
+	KlingAPIBase    string
+	RunwayAPIKey    string
+	RunwayAPIBase   string
+	LumaAPIKey      string
+	LumaAPIBase     string
+	VeoAPIKey       string
+	VeoAPIBase      string
 }
 
 func Load() Config {
@@ -36,7 +48,19 @@ func Load() Config {
 		ElevenLabsMock:  envBool("ELEVENLABS_MOCK"),
 		StorageDir:      envOr("STORAGE_DIR", "./storage"),
 		RenderDir:       envOr("RENDER_DIR", "../worker-render"),
-		SupervisorMin:   envInt("SUPERVISOR_MIN_SCORE", 75),
+		SupervisorMin:        envInt("SUPERVISOR_MIN_SCORE", 75),
+		VideoMock:            envBool("VIDEO_MOCK"),
+		VideoMaxScenes:       envInt("VIDEO_MAX_SCENES", 3),
+		VideoPollIntervalSec: envInt("VIDEO_POLL_INTERVAL_SEC", 5),
+		VideoMaxPollMin:      envInt("VIDEO_MAX_POLL_MIN", 15),
+		KlingAPIKey:          strings.TrimSpace(os.Getenv("KLING_API_KEY")),
+		KlingAPIBase:         envOr("KLING_API_BASE", ""),
+		RunwayAPIKey:         strings.TrimSpace(os.Getenv("RUNWAY_API_KEY")),
+		RunwayAPIBase:        envOr("RUNWAY_API_BASE", ""),
+		LumaAPIKey:           strings.TrimSpace(os.Getenv("LUMA_API_KEY")),
+		LumaAPIBase:          envOr("LUMA_API_BASE", ""),
+		VeoAPIKey:            strings.TrimSpace(os.Getenv("GOOGLE_VEO_API_KEY")),
+		VeoAPIBase:           envOr("GOOGLE_VEO_API_BASE", ""),
 	}
 }
 

@@ -2,8 +2,8 @@ import React from "react";
 import {
   AbsoluteFill,
   Audio,
+  OffthreadVideo,
   interpolate,
-  Sequence,
   useCurrentFrame,
   useVideoConfig,
 } from "remotion";
@@ -15,6 +15,7 @@ type Manifest = {
     durationMs: number;
     background: string;
     narration: string;
+    videoUrl?: string;
   }>;
   captions?: {
     style?: string;
@@ -23,6 +24,9 @@ type Manifest = {
   audio?: { narrationUrl?: string; musicVolume?: number };
   productName?: string;
 };
+
+const mediaSrc = (url: string) =>
+  url.startsWith("http") ? url : `http://localhost:8080${url}`;
 
 export const UGCVertical: React.FC<{ manifest: Manifest }> = ({ manifest }) => {
   const frame = useCurrentFrame();
@@ -40,25 +44,35 @@ export const UGCVertical: React.FC<{ manifest: Manifest }> = ({ manifest }) => {
 
   return (
     <AbsoluteFill style={{ backgroundColor: bg, fontFamily: "system-ui, sans-serif" }}>
+      {scene?.videoUrl ? (
+        <AbsoluteFill>
+          <OffthreadVideo
+            src={mediaSrc(scene.videoUrl)}
+            style={{ width: "100%", height: "100%", objectFit: "cover" }}
+          />
+          <AbsoluteFill style={{ backgroundColor: "rgba(0,0,0,0.35)" }} />
+        </AbsoluteFill>
+      ) : null}
+
       {manifest.audio?.narrationUrl ? (
-        <Audio src={manifest.audio.narrationUrl.startsWith("http") ? manifest.audio.narrationUrl : `http://localhost:8080${manifest.audio.narrationUrl}`} />
+        <Audio src={mediaSrc(manifest.audio.narrationUrl)} />
       ) : null}
 
       <AbsoluteFill
         style={{
-          justifyContent: "center",
+          justifyContent: "flex-end",
           alignItems: "center",
-          padding: 48,
+          padding: "120px 48px",
         }}
       >
         <div
           style={{
             color: "white",
-            fontSize: 52,
+            fontSize: 48,
             fontWeight: 800,
             textAlign: "center",
             lineHeight: 1.2,
-            textShadow: "0 4px 24px rgba(0,0,0,0.6)",
+            textShadow: "0 4px 24px rgba(0,0,0,0.8)",
           }}
         >
           {activeWords.length > 0

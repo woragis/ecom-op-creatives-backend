@@ -10,6 +10,8 @@ func Mount(mux *http.ServeMux, app *App) {
 		mux.Handle("GET /media/", http.StripPrefix("/media/", http.FileServer(http.Dir(app.StorageDir))))
 	}
 
+	mux.HandleFunc("GET /v1/video-providers", handleVideoProviders(app.VideoProviders))
+
 	if app.Products != nil {
 		ph := newProductHandler(app.Products)
 		mux.HandleFunc("GET /v1/products", ph.list)

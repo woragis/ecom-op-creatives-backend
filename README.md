@@ -65,6 +65,13 @@ DATABASE_URL=postgres://creatives:creatives@localhost:5432/creatives?sslmode=dis
   go test -tags=integration ./internal/product/repository/...
 ```
 
+## Phase 2 (em progresso) — AI video
+
+- Providers plugáveis: Kling, Runway, Luma, Veo (+ mock)
+- Step `video` gera clips por cena (até `VIDEO_MAX_SCENES`)
+- Remotion usa `videoUrl` por cena quando disponível
+- `GET /v1/video-providers` — lista providers e status configured
+
 ## Phase 1 entregue
 
 - Research agent: LLM queries → Serper → LLM synthesis

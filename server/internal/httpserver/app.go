@@ -8,9 +8,10 @@ import (
 )
 
 type App struct {
-	DB         *gorm.DB
-	RabbitMQ   *rabbitmq.Client
-	StorageDir string
-	Products   *productsvc.Service
-	Runs       *creativerunsvc.Service
+	DB                *gorm.DB
+	RabbitMQ          *rabbitmq.Client
+	StorageDir        string
+	VideoProviders    []string
+	Products          *productsvc.Service
+	Runs              *creativerunsvc.Service
 }

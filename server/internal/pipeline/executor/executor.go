@@ -23,6 +23,7 @@ import (
 	rendermedia "github.com/woragis/ecom-op-creatives-backend/server/internal/media/render"
 	"github.com/woragis/ecom-op-creatives-backend/server/internal/media/storage"
 	"github.com/woragis/ecom-op-creatives-backend/server/internal/media/subtitles"
+	"github.com/woragis/ecom-op-creatives-backend/server/internal/media/video"
 	"github.com/woragis/ecom-op-creatives-backend/server/internal/models"
 	pipelinesvc "github.com/woragis/ecom-op-creatives-backend/server/internal/pipeline/service"
 	productrepo "github.com/woragis/ecom-op-creatives-backend/server/internal/product/repository"
@@ -41,6 +42,7 @@ type Executor struct {
 	director  *directoragent.Agent
 	prompter  *prompteragent.Agent
 	supervisor *supervisoragent.Agent
+	video      *video.Service
 }
 
 type Deps struct {
@@ -56,6 +58,7 @@ type Deps struct {
 	Director   *directoragent.Agent
 	Prompter   *prompteragent.Agent
 	Supervisor *supervisoragent.Agent
+	Video      *video.Service
 }
 
 func New(d Deps) *Executor {
@@ -64,6 +67,7 @@ func New(d Deps) *Executor {
 		storage: d.Storage, tts: d.TTS,
 		research: d.Research, hooks: d.Hooks, script: d.Script,
 		director: d.Director, prompter: d.Prompter, supervisor: d.Supervisor,
+		video: d.Video,
 	}
 }
 
@@ -269,12 +273,25 @@ func (e *Executor) stepImage(ctx context.Context, rc *runContext) ([]byte, error
 }
 
 func (e *Executor) stepVideo(ctx context.Context, rc *runContext) ([]byte, error) {
-	_ = ctx
-	return json.Marshal(map[string]any{
-		"skipped":  true,
-		"reason":   "phase1-no-ai-video",
-		"provider": rc.run.VideoProvider,
-	})
+	if e.video == nil {
+		return json.Marshal(map[string]any{
+			"skipped":  true,
+			"reason":   "video service not configured",
+			"provider": rc.run.VideoProvider,
+		})
+	}
+	var prompterOut *prompteragent.Output
+	var script *scriptwriter.Output
+	_ = json.Unmarshal(rc.outputs["prompter"], &prompterOut)
+	_ = json.Unmarshal(rc.outputs["script"], &script)
+	if prompterOut == nil || script == nil {
+		return nil, fmt.Errorf("missing prompter or script output")
+	}
+	out, err := e.video.GenerateScenes(ctx, rc.run.VideoProvider, rc.run.ID.String(), prompterOut, script)
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(out)
 }
 
 func (e *Executor) stepSubtitles(ctx context.Context, rc *runContext) ([]byte, error) {
@@ -296,7 +313,9 @@ func (e *Executor) stepRender(ctx context.Context, rc *runContext) ([]byte, erro
 	_ = json.Unmarshal(rc.outputs["voice"], &voice)
 
 	narrationURL, _ := voice["publicUrl"].(string)
-	manifest := rendermedia.BuildManifest(rc.run.ID.String(), rc.product.Name, narrationURL, script, dir, caps)
+	var videoOut *video.StepOutput
+	_ = json.Unmarshal(rc.outputs["video"], &videoOut)
+	manifest := rendermedia.BuildManifest(rc.run.ID.String(), rc.product.Name, narrationURL, script, dir, caps, video.ClipsBySceneID(videoOut))
 	manifestBytes, err := manifest.JSON()
 	if err != nil {
 		return nil, err

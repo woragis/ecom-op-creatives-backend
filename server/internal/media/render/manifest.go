@@ -9,11 +9,12 @@ import (
 )
 
 type Scene struct {
-	ID         string             `json:"id"`
-	StartMs    int                `json:"startMs"`
-	DurationMs int                `json:"durationMs"`
-	Background string             `json:"background"`
-	Narration  string             `json:"narration"`
+	ID         string              `json:"id"`
+	StartMs    int                 `json:"startMs"`
+	DurationMs int                 `json:"durationMs"`
+	Background string              `json:"background"`
+	Narration  string              `json:"narration"`
+	VideoURL   string              `json:"videoUrl,omitempty"`
 	Transition director.Transition `json:"transition"`
 }
 
@@ -36,7 +37,11 @@ func BuildManifest(
 	script *scriptwriter.Output,
 	dir *director.Output,
 	caps *subtitles.Output,
+	sceneVideos map[string]string,
 ) *Manifest {
+	if sceneVideos == nil {
+		sceneVideos = map[string]string{}
+	}
 	dirMap := map[string]director.SceneDirection{}
 	for _, s := range dir.Scenes {
 		dirMap[s.SceneID] = s
@@ -57,6 +62,7 @@ func BuildManifest(
 			DurationMs: sc.EndMs - sc.StartMs,
 			Background: bg,
 			Narration:  sc.Narration,
+			VideoURL:   sceneVideos[sc.ID],
 			Transition: tr,
 		})
 	}

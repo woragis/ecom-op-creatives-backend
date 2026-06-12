@@ -19,6 +19,7 @@ import (
 	"github.com/woragis/ecom-op-creatives-backend/server/internal/pipeline"
 	pipelinesvc "github.com/woragis/ecom-op-creatives-backend/server/internal/pipeline/service"
 	"github.com/woragis/ecom-op-creatives-backend/server/internal/config"
+	"github.com/woragis/ecom-op-creatives-backend/server/internal/media/video"
 	"github.com/woragis/ecom-op-creatives-backend/server/internal/platform/postgres"
 	"github.com/woragis/ecom-op-creatives-backend/server/internal/platform/rabbitmq"
 	productrepo "github.com/woragis/ecom-op-creatives-backend/server/internal/product/repository"
@@ -75,6 +76,7 @@ func main() {
 	}
 
 	cfg := config.Load()
+	videoRegistry := video.NewRegistry(cfg)
 	productRepository := productrepo.New(db)
 	runRepository := creativerunrepo.New(db)
 	pipelineService := pipelinesvc.New(mq)
@@ -82,11 +84,12 @@ func main() {
 	productService := productsvc.New(productRepository)
 
 	app := &httpserver.App{
-		DB:         db,
-		RabbitMQ:   mq,
-		StorageDir: cfg.StorageDir,
-		Products:   productService,
-		Runs:       runService,
+		DB:             db,
+		RabbitMQ:       mq,
+		StorageDir:     cfg.StorageDir,
+		VideoProviders: videoRegistry.Available(),
+		Products:       productService,
+		Runs:           runService,
 	}
 
 	handler := httpserver.NewHandler(app, middleware.LoadConfigFromEnv())
