@@ -2,10 +2,12 @@ package rabbitmq
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"sync"
 
 	amqp "github.com/rabbitmq/amqp091-go"
+	"github.com/woragis/ecom-op-creatives-backend/server/internal/platform/applog"
 )
 
 type Client struct {
@@ -82,11 +84,20 @@ func (c *Client) Publish(ctx context.Context, queue string, body []byte) error {
 			return err
 		}
 	}
-	return c.ch.PublishWithContext(ctx, "", queue, false, false, amqp.Publishing{
+	log := applog.FromContext(ctx).With("component", "rabbitmq", "operation", "publish", "queue", queue)
+	if fields := jobLogFields(body); len(fields) > 0 {
+		log = log.With(fields...)
+	}
+	if err := c.ch.PublishWithContext(ctx, "", queue, false, false, amqp.Publishing{
 		ContentType:  "application/json",
 		DeliveryMode: amqp.Persistent,
 		Body:         body,
-	})
+	}); err != nil {
+		log.Error("rabbitmq publish failed", "error", err.Error())
+		return err
+	}
+	log.Info("rabbitmq message published", "bytes", len(body))
+	return nil
 }
 
 func (c *Client) Consume(queue string, handler func(amqp.Delivery) error) error {
@@ -104,14 +115,32 @@ func (c *Client) Consume(queue string, handler func(amqp.Delivery) error) error 
 	}
 	go func() {
 		for d := range deliveries {
+			log := applog.L().With("component", "rabbitmq", "operation", "dequeue", "queue", queue)
+			if fields := jobLogFields(d.Body); len(fields) > 0 {
+				log = log.With(fields...)
+			}
+			log.Info("rabbitmq message received", "bytes", len(d.Body))
 			if err := handler(d); err != nil {
-				_ = d.Nack(false, true)
+				log.Error("rabbitmq handler failed", "error", err.Error(), "requeue", false)
+				_ = d.Nack(false, false)
 				continue
 			}
 			_ = d.Ack(false)
 		}
 	}()
 	return nil
+}
+
+func jobLogFields(body []byte) []any {
+	var msg JobMessage
+	if err := json.Unmarshal(body, &msg); err != nil {
+		return nil
+	}
+	fields := []any{"run_id", msg.CreativeRunID, "step_id", msg.StepID, "step", msg.StepType}
+	if msg.Attempt > 0 {
+		fields = append(fields, "attempt", msg.Attempt)
+	}
+	return fields
 }
 
 func (c *Client) Close() error {
