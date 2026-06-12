@@ -17,8 +17,9 @@ type Config struct {
 	ElevenLabsKey   string
 	ElevenLabsVoice string
 	ElevenLabsMock  bool
-	OpenAITTSModel  string
-	OpenAITTSVoice  string
+	OpenAITTSModel   string
+	OpenAITTSVoice   string
+	OpenAIImageModel string
 	StorageDir      string
 	RenderDir       string
 	SupervisorMin   int
@@ -28,14 +29,17 @@ type Config struct {
 	VideoMaxPollMin int
 	KlingAPIKey     string
 	KlingAPIBase    string
-	RunwayAPIKey    string
-	RunwayAPIBase   string
+	RunwayAPIKey     string
+	RunwayAPIBase    string
+	RunwayTextModel  string
+	RunwayImageModel string
 	LumaAPIKey      string
 	LumaAPIBase     string
 	VeoAPIKey       string
 	VeoAPIBase      string
 	ImageMock       bool
 	ImageMaxScenes  int
+	ImagePreferGenerated bool
 	FluxAPIKey      string
 	FluxAPIBase     string
 	IdeogramAPIKey  string
@@ -50,6 +54,7 @@ type Config struct {
 	APIPublicURL         string
 	APIInternalURL       string
 	PauseBeforeVideo     bool
+	VideoForceText2Video bool
 	LogLevel             string
 	LogFormat            string
 }
@@ -66,8 +71,9 @@ func Load() Config {
 		ElevenLabsKey:   strings.TrimSpace(os.Getenv("ELEVENLABS_API_KEY")),
 		ElevenLabsVoice: envOr("ELEVENLABS_VOICE_ID", "21m00Tcm4TlvDq8ikWAM"),
 		ElevenLabsMock:  envBool("ELEVENLABS_MOCK"),
-		OpenAITTSModel:  envOr("OPENAI_TTS_MODEL", "tts-1"),
-		OpenAITTSVoice:  envOr("OPENAI_TTS_VOICE", "alloy"),
+		OpenAITTSModel:   envOr("OPENAI_TTS_MODEL", "tts-1"),
+		OpenAITTSVoice:   envOr("OPENAI_TTS_VOICE", "alloy"),
+		OpenAIImageModel: envOr("OPENAI_IMAGE_MODEL", "gpt-image-1-mini"),
 		StorageDir:      envOr("STORAGE_DIR", "../storage"),
 		RenderDir:       envOr("RENDER_DIR", "../worker-render"),
 		SupervisorMin:        envInt("SUPERVISOR_MIN_SCORE", 75),
@@ -79,12 +85,15 @@ func Load() Config {
 		KlingAPIBase:         envOr("KLING_API_BASE", ""),
 		RunwayAPIKey:         strings.TrimSpace(os.Getenv("RUNWAY_API_KEY")),
 		RunwayAPIBase:        envOr("RUNWAY_API_BASE", ""),
+		RunwayTextModel:      envOr("RUNWAY_TEXT_MODEL", "gen4.5"),
+		RunwayImageModel:     envOr("RUNWAY_IMAGE_MODEL", "gen4_turbo"),
 		LumaAPIKey:           strings.TrimSpace(os.Getenv("LUMA_API_KEY")),
 		LumaAPIBase:          envOr("LUMA_API_BASE", ""),
 		VeoAPIKey:            strings.TrimSpace(os.Getenv("GOOGLE_VEO_API_KEY")),
 		VeoAPIBase:           envOr("GOOGLE_VEO_API_BASE", ""),
 		ImageMock:            envBool("IMAGE_MOCK"),
 		ImageMaxScenes:       envInt("IMAGE_MAX_SCENES", 3),
+		ImagePreferGenerated: envBool("IMAGE_PREFER_GENERATED"),
 		FluxAPIKey:           strings.TrimSpace(os.Getenv("FLUX_API_KEY")),
 		FluxAPIBase:          envOr("FLUX_API_BASE", ""),
 		IdeogramAPIKey:       strings.TrimSpace(os.Getenv("IDEOGRAM_API_KEY")),
@@ -99,6 +108,7 @@ func Load() Config {
 		APIPublicURL:         envOr("API_PUBLIC_URL", "http://localhost:8080"),
 		APIInternalURL:       strings.TrimSpace(os.Getenv("API_INTERNAL_URL")),
 		PauseBeforeVideo:     envBool("PAUSE_BEFORE_VIDEO"),
+		VideoForceText2Video: envBool("VIDEO_FORCE_TEXT2VIDEO"),
 		LogLevel:             envOr("LOG_LEVEL", "info"),
 		LogFormat:            envOr("LOG_FORMAT", "json"),
 	}

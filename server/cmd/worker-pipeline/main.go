@@ -105,6 +105,11 @@ func handleJob(ctx context.Context, exec interface {
 	if err != nil {
 		return err
 	}
-	slog.Info("job received", "step_id", msg.StepID, "step_type", msg.StepType)
+	applog.L().With("component", "worker").Info("job received",
+		"run_id", msg.CreativeRunID,
+		"step_id", msg.StepID,
+		"step", msg.StepType,
+		"attempt", msg.Attempt,
+	)
 	return exec.ProcessStep(ctx, stepID)
 }
