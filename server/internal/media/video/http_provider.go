@@ -8,6 +8,8 @@ import (
 	"io"
 	"net/http"
 	"time"
+
+	"github.com/woragis/ecom-op-creatives-backend/server/internal/platform/applog"
 )
 
 type HTTPProvider struct {
@@ -41,6 +43,8 @@ func (p *HTTPProvider) Poll(ctx context.Context, jobID string) (*JobResult, erro
 }
 
 func (p *HTTPProvider) postJSON(ctx context.Context, path string, body any, out any) error {
+	started := time.Now()
+	log := applog.FromContext(ctx).With("service", p.id, "operation", "http.post", "path", path)
 	b, err := json.Marshal(body)
 	if err != nil {
 		return err
@@ -60,15 +64,25 @@ func (p *HTTPProvider) postJSON(ctx context.Context, path string, body any, out 
 		return err
 	}
 	if res.StatusCode >= 400 {
+		log.Error("video provider post failed",
+			"status", res.StatusCode,
+			"duration_ms", time.Since(started).Milliseconds(),
+			"body_preview", applog.Truncate(string(raw), 300),
+		)
 		return fmt.Errorf("%s post %s: %d %s", p.id, path, res.StatusCode, string(raw))
 	}
 	if out != nil {
-		return json.Unmarshal(raw, out)
+		if err := json.Unmarshal(raw, out); err != nil {
+			return err
+		}
 	}
+	log.Debug("video provider post ok", "duration_ms", time.Since(started).Milliseconds())
 	return nil
 }
 
 func (p *HTTPProvider) getJSON(ctx context.Context, path string, out any) error {
+	started := time.Now()
+	log := applog.FromContext(ctx).With("service", p.id, "operation", "http.get", "path", path)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, p.baseURL+path, nil)
 	if err != nil {
 		return err
@@ -84,9 +98,18 @@ func (p *HTTPProvider) getJSON(ctx context.Context, path string, out any) error 
 		return err
 	}
 	if res.StatusCode >= 400 {
+		log.Error("video provider get failed",
+			"status", res.StatusCode,
+			"duration_ms", time.Since(started).Milliseconds(),
+			"body_preview", applog.Truncate(string(raw), 300),
+		)
 		return fmt.Errorf("%s get %s: %d %s", p.id, path, res.StatusCode, string(raw))
 	}
-	return json.Unmarshal(raw, out)
+	if err := json.Unmarshal(raw, out); err != nil {
+		return err
+	}
+	log.Debug("video provider get ok", "duration_ms", time.Since(started).Milliseconds())
+	return nil
 }
 
 func (p *HTTPProvider) setHeaders(req *http.Request) {
