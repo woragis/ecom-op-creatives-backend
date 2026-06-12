@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/woragis/ecom-op-creatives-backend/server/internal/pipeline"
+	"github.com/woragis/ecom-op-creatives-backend/server/internal/platform/applog"
 )
 
 func (l *Local) ArtifactsDir(runID string) string {
@@ -25,7 +26,12 @@ func (l *Local) WriteStepArtifact(runID, stepType string, output []byte) error {
 	}
 	order := pipeline.StepOrder(stepType)
 	name := fmt.Sprintf("%02d-%s.json", order, stepType)
-	return os.WriteFile(filepath.Join(dir, name), output, 0o644)
+	path := filepath.Join(dir, name)
+	if err := os.WriteFile(path, output, 0o644); err != nil {
+		return err
+	}
+	applog.L().With("run_id", runID, "step", stepType).Info("artifact written", "path", path, "bytes", len(output))
+	return nil
 }
 
 // WriteStepErrorArtifact records a failed step attempt on disk.
@@ -45,7 +51,12 @@ func (l *Local) WriteStepErrorArtifact(runID, stepType, message string) error {
 		return err
 	}
 	name := fmt.Sprintf("%02d-%s.error.json", order, stepType)
-	return os.WriteFile(filepath.Join(dir, name), body, 0o644)
+	path := filepath.Join(dir, name)
+	if err := os.WriteFile(path, body, 0o644); err != nil {
+		return err
+	}
+	applog.L().With("run_id", runID, "step", stepType).Warn("error artifact written", "path", path)
+	return nil
 }
 
 // WriteRunMeta writes a summary file after each step completes.
@@ -58,5 +69,10 @@ func (l *Local) WriteRunMeta(runID string, meta map[string]any) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(filepath.Join(dir, "run-meta.json"), body, 0o644)
+	path := filepath.Join(dir, "run-meta.json")
+	if err := os.WriteFile(path, body, 0o644); err != nil {
+		return err
+	}
+	applog.L().With("run_id", runID).Info("run meta written", "path", path, "bytes", len(body))
+	return nil
 }

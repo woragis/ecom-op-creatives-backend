@@ -58,6 +58,10 @@ func (l *Local) InputDir(runID string) string {
 	return filepath.Join(l.RunDir(runID), "input")
 }
 
+func (l *Local) LogsDir(runID string) string {
+	return filepath.Join(l.RunDir(runID), "logs")
+}
+
 func (l *Local) WriteInputFile(runID, assetType, ext string, data []byte) (string, string, error) {
 	dir := l.InputDir(runID)
 	if err := os.MkdirAll(dir, 0o755); err != nil {

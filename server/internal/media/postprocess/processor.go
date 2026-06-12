@@ -6,8 +6,10 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"time"
 
 	"github.com/woragis/ecom-op-creatives-backend/server/internal/config"
+	"github.com/woragis/ecom-op-creatives-backend/server/internal/platform/applog"
 )
 
 // minimal JPEG SOI/EOI
@@ -42,18 +44,27 @@ func New(cfg config.Config) *Processor {
 }
 
 func (p *Processor) Process(ctx context.Context, draftPath, finalPath, thumbPath string) (*Result, error) {
+	log := applog.FromContext(ctx).With("service", "ffmpeg", "operation", "postprocess")
 	if err := os.MkdirAll(filepath.Dir(finalPath), 0o755); err != nil {
 		return nil, err
 	}
 	if p.mock || isMockVideo(draftPath) || !p.ffmpegAvailable() {
+		log.Info("ffmpeg postprocess mock", "draft", draftPath, "final", finalPath)
 		return p.mockProcess(draftPath, finalPath, thumbPath)
 	}
+	started := time.Now()
 	if err := p.normalize(ctx, draftPath, finalPath); err != nil {
 		return nil, err
 	}
 	if err := p.extractThumbnail(ctx, finalPath, thumbPath); err != nil {
 		return nil, err
 	}
+	log.Info("ffmpeg postprocess completed",
+		"duration_ms", time.Since(started).Milliseconds(),
+		"draft", draftPath,
+		"final", finalPath,
+		"thumbnail", thumbPath,
+	)
 	return &Result{LoudnessApplied: true, ThumbnailFrom: "ffmpeg"}, nil
 }
 
@@ -77,6 +88,9 @@ func (p *Processor) ffmpegAvailable() bool {
 }
 
 func (p *Processor) normalize(ctx context.Context, inPath, outPath string) error {
+	log := applog.FromContext(ctx).With("service", "ffmpeg", "operation", "loudnorm")
+	started := time.Now()
+	log.Info("ffmpeg loudnorm started", "input", inPath, "output", outPath)
 	cmd := exec.CommandContext(ctx, p.ffmpegPath,
 		"-y", "-i", inPath,
 		"-af", "loudnorm=I=-16:TP=-1.5:LRA=11",
@@ -87,12 +101,20 @@ func (p *Processor) normalize(ctx context.Context, inPath, outPath string) error
 	)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
+		log.Error("ffmpeg loudnorm failed",
+			"duration_ms", time.Since(started).Milliseconds(),
+			"stderr_preview", applog.Truncate(string(out), 400),
+		)
 		return fmt.Errorf("ffmpeg loudnorm: %w: %s", err, string(out))
 	}
+	log.Info("ffmpeg loudnorm completed", "duration_ms", time.Since(started).Milliseconds())
 	return nil
 }
 
 func (p *Processor) extractThumbnail(ctx context.Context, videoPath, thumbPath string) error {
+	log := applog.FromContext(ctx).With("service", "ffmpeg", "operation", "thumbnail")
+	started := time.Now()
+	log.Info("ffmpeg thumbnail started", "input", videoPath, "output", thumbPath)
 	cmd := exec.CommandContext(ctx, p.ffmpegPath,
 		"-y", "-i", videoPath,
 		"-ss", "00:00:01",
@@ -102,8 +124,13 @@ func (p *Processor) extractThumbnail(ctx context.Context, videoPath, thumbPath s
 	)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
+		log.Error("ffmpeg thumbnail failed",
+			"duration_ms", time.Since(started).Milliseconds(),
+			"stderr_preview", applog.Truncate(string(out), 400),
+		)
 		return fmt.Errorf("ffmpeg thumbnail: %w: %s", err, string(out))
 	}
+	log.Info("ffmpeg thumbnail completed", "duration_ms", time.Since(started).Milliseconds())
 	return nil
 }
 

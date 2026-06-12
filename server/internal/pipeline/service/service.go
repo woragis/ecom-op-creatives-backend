@@ -7,6 +7,7 @@ import (
 	"github.com/woragis/ecom-op-creatives-backend/server/internal/apperrors"
 	"github.com/woragis/ecom-op-creatives-backend/server/internal/models"
 	"github.com/woragis/ecom-op-creatives-backend/server/internal/pipeline"
+	"github.com/woragis/ecom-op-creatives-backend/server/internal/platform/applog"
 	"github.com/woragis/ecom-op-creatives-backend/server/internal/platform/rabbitmq"
 )
 
@@ -36,6 +37,13 @@ func (s *Service) EnqueueStep(ctx context.Context, step *models.PipelineStep) er
 	if err != nil {
 		return apperrors.Wrapf(err, "marshal job message")
 	}
+	applog.FromContext(ctx).With("component", "pipeline", "operation", "enqueue").Info("enqueue step",
+		"run_id", step.CreativeRunID.String(),
+		"step_id", step.ID.String(),
+		"step", step.StepType,
+		"queue", queue,
+		"attempt", step.AttemptCount+1,
+	)
 	if err := s.pub.Publish(ctx, queue, body); err != nil {
 		return apperrors.Wrapf(err, "publish job")
 	}
