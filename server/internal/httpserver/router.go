@@ -29,6 +29,7 @@ func Mount(mux *http.ServeMux, app *App) {
 		mux.HandleFunc("POST /v1/creative-runs/{id}/assets/{type}", rh.uploadAsset)
 		mux.HandleFunc("PATCH /v1/creative-runs/{id}/steps/{stepId}", rh.patchStep)
 		mux.HandleFunc("POST /v1/creative-runs/{id}/reprocess", rh.reprocess)
+		mux.HandleFunc("POST /v1/creative-runs/{id}/continue", rh.continueRun)
 		mux.HandleFunc("POST /v1/creative-runs/{id}/approve", rh.approve)
 		mux.HandleFunc("POST /v1/creative-runs/{id}/steps/{stepId}/retry", rh.retryStep)
 	}

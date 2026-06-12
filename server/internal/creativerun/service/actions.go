@@ -16,8 +16,39 @@ func (s *Service) ApproveRun(ctx context.Context, id uuid.UUID) (*models.Creativ
 	if run.Status != models.RunStatusNeedsReview && run.Status != models.RunStatusApproved {
 		return nil, apperrors.ConflictErr(apperrors.CodeCreativeRunApproveInvalid, apperrors.MsgCreativeRunApproveInvalid)
 	}
+	pending, err := s.repo.HasPendingSteps(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	if pending {
+		return nil, apperrors.ConflictErr(apperrors.CodeCreativeRunApproveInvalid, apperrors.MsgCreativeRunApproveInvalid)
+	}
 	if err := s.repo.UpdateRunStatus(ctx, id, models.RunStatusApproved); err != nil {
 		return nil, apperrors.Wrapf(err, "approve run")
+	}
+	return s.repo.GetByID(ctx, id)
+}
+
+func (s *Service) ContinueRun(ctx context.Context, id uuid.UUID) (*models.CreativeRun, error) {
+	run, err := s.repo.GetByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	if run.Status != models.RunStatusNeedsReview {
+		return nil, apperrors.ConflictErr(apperrors.CodeCreativeRunContinueInvalid, apperrors.MsgCreativeRunContinueInvalid)
+	}
+	next, err := s.repo.FirstPendingStep(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	if next == nil {
+		return nil, apperrors.ConflictErr(apperrors.CodeCreativeRunContinueInvalid, apperrors.MsgCreativeRunContinueInvalid)
+	}
+	if err := s.repo.UpdateRunStatus(ctx, id, models.RunStatusRunning); err != nil {
+		return nil, apperrors.Wrapf(err, "continue run")
+	}
+	if err := s.pipelineSvc.EnqueueStep(ctx, next); err != nil {
+		return nil, err
 	}
 	return s.repo.GetByID(ctx, id)
 }

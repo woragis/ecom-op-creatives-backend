@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"log"
+	"log/slog"
 	"os"
 	"os/signal"
 	"strings"
@@ -22,9 +23,11 @@ import (
 	"github.com/woragis/ecom-op-creatives-backend/server/internal/platform/postgres"
 	"github.com/woragis/ecom-op-creatives-backend/server/internal/platform/rabbitmq"
 	productrepo "github.com/woragis/ecom-op-creatives-backend/server/internal/product/repository"
+	"github.com/woragis/ecom-op-creatives-backend/server/internal/platform/applog"
 )
 
 func main() {
+	applog.Init()
 	cfg := config.Load()
 	dsn := os.Getenv("DATABASE_URL")
 	if dsn == "" {
@@ -82,7 +85,7 @@ func main() {
 		}); err != nil {
 			log.Fatalf("consume %s: %v", q, err)
 		}
-		log.Printf("worker-pipeline consuming %s", q)
+		slog.Info("worker consuming queue", "queue", q)
 	}
 
 	sig := make(chan os.Signal, 1)
@@ -102,6 +105,6 @@ func handleJob(ctx context.Context, exec interface {
 	if err != nil {
 		return err
 	}
-	log.Printf("processing step %s (%s)", msg.StepID, msg.StepType)
+	slog.Info("job received", "step_id", msg.StepID, "step_type", msg.StepType)
 	return exec.ProcessStep(ctx, stepID)
 }

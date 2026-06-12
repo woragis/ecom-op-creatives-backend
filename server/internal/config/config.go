@@ -49,6 +49,9 @@ type Config struct {
 	IntroDurationMs      int
 	APIPublicURL         string
 	APIInternalURL       string
+	PauseBeforeVideo     bool
+	LogLevel             string
+	LogFormat            string
 }
 
 func Load() Config {
@@ -95,6 +98,9 @@ func Load() Config {
 		IntroDurationMs:      envInt("INTRO_DURATION_MS", 2500),
 		APIPublicURL:         envOr("API_PUBLIC_URL", "http://localhost:8080"),
 		APIInternalURL:       strings.TrimSpace(os.Getenv("API_INTERNAL_URL")),
+		PauseBeforeVideo:     envBool("PAUSE_BEFORE_VIDEO"),
+		LogLevel:             envOr("LOG_LEVEL", "info"),
+		LogFormat:            envOr("LOG_FORMAT", "json"),
 	}
 }
 

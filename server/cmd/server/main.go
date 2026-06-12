@@ -19,6 +19,7 @@ import (
 	"github.com/woragis/ecom-op-creatives-backend/server/internal/pipeline"
 	pipelinesvc "github.com/woragis/ecom-op-creatives-backend/server/internal/pipeline/service"
 	"github.com/woragis/ecom-op-creatives-backend/server/internal/config"
+	"github.com/woragis/ecom-op-creatives-backend/server/internal/platform/applog"
 	imagemedia "github.com/woragis/ecom-op-creatives-backend/server/internal/media/image"
 	"github.com/woragis/ecom-op-creatives-backend/server/internal/media/storage"
 	"github.com/woragis/ecom-op-creatives-backend/server/internal/media/video"
@@ -29,6 +30,7 @@ import (
 )
 
 func main() {
+	applog.Init()
 	addr := envOr("HTTP_ADDR", ":8080")
 	dsn := os.Getenv("DATABASE_URL")
 	if dsn == "" {

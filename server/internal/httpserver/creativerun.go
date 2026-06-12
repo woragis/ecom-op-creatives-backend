@@ -190,6 +190,20 @@ func (h *creativeRunHandler) reprocess(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, run)
 }
 
+func (h *creativeRunHandler) continueRun(w http.ResponseWriter, r *http.Request) {
+	id, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		writeServiceError(w, err)
+		return
+	}
+	run, err := h.svc.ContinueRun(r.Context(), id)
+	if err != nil {
+		writeServiceError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, run)
+}
+
 func (h *creativeRunHandler) approve(w http.ResponseWriter, r *http.Request) {
 	id, err := uuid.Parse(r.PathValue("id"))
 	if err != nil {

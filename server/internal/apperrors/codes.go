@@ -39,4 +39,7 @@ const (
 
 	CodeCreativeRunRetryInvalid = "CREATIVE_RUN_RETRY_V1_SERVICE_INVALID"
 	MsgCreativeRunRetryInvalid  = "Step cannot be retried in its current state"
+
+	CodeCreativeRunContinueInvalid = "CREATIVE_RUN_CONTINUE_V1_SERVICE_INVALID"
+	MsgCreativeRunContinueInvalid  = "Run cannot be continued in its current state"
 )
